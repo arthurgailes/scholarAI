@@ -2,42 +2,18 @@
 
 ## Project Overview
 - This is an R package called "scholarAI" for emulating American Enterprise Institute scholars
-- Primary focus is on text generation using AI based on scholarly content
-- Package uses external text files as corpus
 
 ## Code Structure
 - Package follows standard R package structure, compliant with tidyverse standards
-- Main functionality is in R/ directory
 - Documentation uses roxygen2 format
 - Test files should be placed in tests/ directory
+- Use pkg::fun inside functions, not library(pkg)
+- Keep functions short and single-purpose.
 
-## Data Handling
-- Package reads text files from configurable data directories
-- Text files contain scholarly content to be used as context for AI generation
-
-## Style Guidelines
-- Follow tidyverse style guide for R code
-- Exported functions should use verb_noun naming convention
-- Internal functions should be prefixed with a period (e.g., .internal_function)
-- Document all exported functions with roxygen2 comments
-
-## AI Generation Rules
-- Models should generate content in the style of specified scholars
-- Generated content should maintain scholarly tone and follow academic standards
-- Package should provide options to adjust generation parameters
-- Output should be properly formatted for R data structures
-
-## Text Corpus Rules
-- Text files should be saved as json with the following structure: 
-
-```json
-{
-  "text": string,
-  "metadata": {
-    "author": string[],
-    "date": string,
-    "url": string,
-    key[string]: any
-  }
-}
-```
+* **Object names** – use lower-case `snake_case`; functions are verbs (`add_row()`), data objects are nouns (`model_df`).  
+* **File layout** – one exported function per file when possible; helpers follow the public function in the same file.  
+* **Function signatures** – first argument is the primary data object; required args have no defaults; wrap long signatures one arg per line with 2-space indents.  
+* **Comments** – explain **why**, not what; sentence-case lines starting with `# ` and separated from code by a blank line.  
+* **Errors & messages** – use `{cli}` bullet-style errors (`cli_abort()` with ✖ / ℹ bullets) for human-centred diagnostics.  
+* **API consistency** – design for human-centred, consistent, composable, inclusive interfaces (the four tidy-design principles).  
+* **Documentation & exports** – every public function has a complete roxygen block (`@description`, `@return`, examples) and ends with `@export`; share parameters with `@inheritParams`.  
