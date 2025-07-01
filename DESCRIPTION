@@ -14,6 +14,7 @@ Imports:
     httr,
     reticulate,
     rvest,
+    xml2,
     yyjsonr
 Suggests: 
     testthat
