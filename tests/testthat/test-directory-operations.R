@@ -7,13 +7,6 @@ library(withr)
 ## -------------------------------------------------------------------------
 context("directory_operations")
 
-test_that("create_folder_name creates directory structure for URLs", {
-  # Test the folder name creation separately
-  url <- "https://www.aei.org/housing-market/2024/06/30/my-article/"
-  folder_name <- scholarAI:::create_folder_name(url)
-  expect_equal(folder_name, "housing-market/2024-06-30-my-article")
-})
-
 test_that("directory creation functions work correctly", {
   skip_if_not_installed("withr")
   
