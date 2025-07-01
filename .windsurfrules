@@ -9,6 +9,7 @@
 - Test files should be placed in tests/ directory
 - Use pkg::fun inside functions, not library(pkg)
 - Keep functions short and single-purpose.
+- Prefer base R in functions, unless necessary or base R would be at least 5x more code
 
 * **Object names** – use lower-case `snake_case`; functions are verbs (`add_row()`), data objects are nouns (`model_df`).  
 * **File layout** – one exported function per file when possible; helpers follow the public function in the same file.  
