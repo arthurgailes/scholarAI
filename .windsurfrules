@@ -2,6 +2,7 @@
 
 ## Project Overview
 - This is an R package called "scholarAI" for emulating American Enterprise Institute scholars
+- Take your time when writing - read more code, add more to context, consider the workplan
 
 ## Code Structure
 - Package follows standard R package structure, compliant with tidyverse standards
@@ -18,3 +19,7 @@
 * **Errors & messages** – use `{cli}` bullet-style errors (`cli_abort()` with ✖ / ℹ bullets) for human-centred diagnostics.  
 * **API consistency** – design for human-centred, consistent, composable, inclusive interfaces (the four tidy-design principles).  
 * **Documentation & exports** – every public function has a complete roxygen block (`@description`, `@return`, examples) and ends with `@export`; share parameters with `@inheritParams`.  
+
+## Testing
+- Use testthat for testing
+- You need Rscript to run R and tests, eg `Rscript -e "devtools::test()"`
