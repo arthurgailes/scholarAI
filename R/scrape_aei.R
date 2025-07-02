@@ -269,6 +269,32 @@ extract_and_save <- function(
 
   handle_pdfs(main_article, url, folder_path, greenlist)
   meta <- extract_metadata(main_article)
+
+  # Create complete metadata object with all required fields
+  # Split author string into a character vector for the authors array
+  author_list <- if (!is.na(meta$author)) {
+    strsplit(meta$author, ", ")[[1]]
+  } else {
+    character(0)
+  }
+  
+  metadata <- list(
+    title = meta$title,
+    link = url,
+    location = page_name,
+    text = text,
+    date = meta$date,
+    authors = author_list
+  )
+
+  # Write metadata to JSON file
+  yyjsonr::write_json_file(
+    metadata,
+    file.path(folder_path, "metadata.json"),
+    pretty = TRUE,
+    auto_unbox = TRUE
+  )
+
   as.list(meta)
 }
 

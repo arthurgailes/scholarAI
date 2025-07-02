@@ -8,6 +8,7 @@ library(rvest)
 library(tibble)
 library(httr)
 library(mockery)
+library(jsonlite)
 
 ## -------------------------------------------------------------------------
 context("get_author_links")
@@ -135,4 +136,29 @@ test_that("scrape_aei downloads real articles for Tobias Peter", {
   # Check that at least one article is by Tobias Peter
   expect_true(any(grepl("Tobias Peter", res$author, ignore.case = TRUE)),
               info = "At least one article should be authored by Tobias Peter.")
+  
+  # Check that metadata.json files were created
+  if (nrow(res) > 0) {
+    # Get the first folder path
+    first_folder <- file.path(out_dir, res$folder_name[1])
+    json_path <- file.path(first_folder, "metadata.json")
+    
+    # Check that the JSON file exists
+    expect_true(file.exists(json_path), 
+                info = "metadata.json file should exist for each article")
+    
+    # Read and validate the JSON content
+    json_content <- jsonlite::read_json(json_path)
+    
+    # Check that all required fields are present
+    expect_true(all(c("title", "link", "location", "text", "date", "authors") %in% names(json_content)),
+                info = "JSON metadata should contain all required fields")
+    
+    # Check that authors is an array in the JSON
+    expect_true("authors" %in% names(json_content),
+                info = "JSON should contain an 'authors' field")
+    
+    # In R, JSON arrays are represented as lists when parsed
+    expect_type(json_content$authors, "list")
+  }
 })
