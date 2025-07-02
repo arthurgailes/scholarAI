@@ -10,6 +10,7 @@ Encoding: UTF-8
 LazyData: true
 Imports: 
     duckdb,
+    ellmer,
     httr,
     reticulate,
     rvest,
@@ -17,3 +18,4 @@ Imports:
     yyjsonr
 Suggests: 
     testthat
+RoxygenNote: 7.3.2
