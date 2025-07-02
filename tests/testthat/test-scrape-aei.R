@@ -162,3 +162,140 @@ test_that("scrape_aei downloads real articles for Tobias Peter", {
     expect_type(json_content$authors, "list")
   }
 })
+
+## -------------------------------------------------------------------------
+context("PDF extraction")
+
+test_that("handle_pdfs extracts PDFs from iframes and links", {
+  skip_on_cran()
+  skip_if_offline(host = "www.aei.org")
+  
+  # Create a temporary directory for test PDFs
+  pdf_test_dir <- file.path(testthat::test_path(), "test_data", "pdf_test")
+  if (dir.exists(pdf_test_dir)) {
+    unlink(pdf_test_dir, recursive = TRUE)
+  }
+  dir.create(pdf_test_dir, recursive = TRUE, showWarnings = FALSE)
+  
+  # Test case 1: Direct PDF in iframe
+  iframe_html <- paste0(
+    "<article>",
+    "  <iframe src='https://www.aei.org/wp-content/uploads/2023/01/sample.pdf'></iframe>",
+    "</article>"
+  )
+  article_node <- xml2::read_html(iframe_html) %>% rvest::html_element("article")
+  
+  # Mock save_pdf to avoid actual downloads during testing
+  original_save_pdf <- scholarAI:::save_pdf
+  mock_save_pdf <- function(pdf_url, dest_path) {
+    # Just create an empty file instead of downloading
+    file.create(dest_path)
+    # Return the URL for verification
+    return(pdf_url)
+  }
+  
+  # Replace with mock temporarily
+  unlockBinding("save_pdf", getNamespace("scholarAI"))
+  assign("save_pdf", mock_save_pdf, getNamespace("scholarAI"))
+  
+  # Test iframe PDF extraction
+  tryCatch({
+    scholarAI:::handle_pdfs(
+      article_node, 
+      "https://www.aei.org/test/", 
+      pdf_test_dir,
+      "https://www.aei.org/housing-supply-case-studies/"
+    )
+    
+    # Check if PDF was "saved"
+    pdf_files <- list.files(pdf_test_dir, pattern = "\\.pdf$")
+    expect_true(length(pdf_files) > 0, 
+                info = "Should extract PDF from iframe")
+    
+    # Clean up for next test
+    unlink(file.path(pdf_test_dir, "*"), recursive = TRUE)
+    
+    # Test case 2: PDF viewer in iframe
+    viewer_html <- paste0(
+      "<article>",
+      "  <iframe src='https://docs.google.com/viewer?url=https%3A%2F%2Fwww.aei.org%2Fwp-content%2Fuploads%2F2023%2F01%2Fsample.pdf'></iframe>",
+      "</article>"
+    )
+    article_node <- xml2::read_html(viewer_html) %>% rvest::html_element("article")
+    
+    scholarAI:::handle_pdfs(
+      article_node, 
+      "https://www.aei.org/test/", 
+      pdf_test_dir,
+      "https://www.aei.org/housing-supply-case-studies/"
+    )
+    
+    # Check if PDF was "saved"
+    pdf_files <- list.files(pdf_test_dir, pattern = "\\.pdf$")
+    expect_true(length(pdf_files) > 0, 
+                info = "Should extract PDF from viewer iframe")
+    
+    # Clean up for next test
+    unlink(file.path(pdf_test_dir, "*"), recursive = TRUE)
+    
+    # Test case 3: PDF links in anchor tags
+    link_html <- paste0(
+      "<article>",
+      "  <a href='https://www.aei.org/wp-content/uploads/2023/01/report.pdf'>Download Report</a>",
+      "</article>"
+    )
+    article_node <- xml2::read_html(link_html) %>% rvest::html_element("article")
+    
+    scholarAI:::handle_pdfs(
+      article_node, 
+      "https://www.aei.org/test/", 
+      pdf_test_dir,
+      "https://www.aei.org/housing-supply-case-studies/"
+    )
+    
+    # Check if PDF was "saved"
+    pdf_files <- list.files(pdf_test_dir, pattern = "\\.pdf$")
+    expect_true(length(pdf_files) > 0, 
+                info = "Should extract PDF from anchor links")
+    
+    # Test case 4: Real-world example with housing market indicators
+    # This test will be skipped if the URL is not accessible
+    tryCatch({
+      res <- httr::GET(
+        "https://www.aei.org/research-products/report/aei-housing-market-indicators-april-2025/",
+        httr::config(ssl_verifypeer = FALSE),
+        httr::timeout(10)
+      )
+      
+      if (!httr::http_error(res)) {
+        html <- xml2::read_html(res)
+        main_element <- rvest::html_element(html, "main")
+        main_article <- rvest::html_element(main_element, "article")
+        if (is.na(main_article)) main_article <- html
+        
+        # Clean up for real test
+        unlink(file.path(pdf_test_dir, "*"), recursive = TRUE)
+        
+        scholarAI:::handle_pdfs(
+          main_article, 
+          "https://www.aei.org/research-products/report/aei-housing-market-indicators-april-2025/", 
+          pdf_test_dir,
+          "https://www.aei.org/housing-supply-case-studies/"
+        )
+        
+        # Check if PDF was "saved"
+        pdf_files <- list.files(pdf_test_dir, pattern = "\\.pdf$")
+        expect_true(length(pdf_files) > 0, 
+                    info = "Should extract PDF from real housing market indicators page")
+      }
+    }, error = function(e) {
+      # Skip this part of the test if the URL is not accessible
+      skip("Could not access the real-world example URL")
+    })
+    
+  }, finally = {
+    # Restore original function
+    assign("save_pdf", original_save_pdf, getNamespace("scholarAI"))
+    lockBinding("save_pdf", getNamespace("scholarAI"))
+  })
+})
