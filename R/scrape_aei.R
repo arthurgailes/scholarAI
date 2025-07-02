@@ -148,7 +148,7 @@ extract_metadata <- function(article_html) {
   author <- gsub("^(By|With) ", "", author)
   author <- gsub("\\|", ", ", author)
 
-  tibble::tibble(title, date, author)
+  data.frame(title, date, author)
 }
 
 first_or <- function(x, default) if (length(x) == 0) default else x[[1]]
@@ -186,7 +186,7 @@ handle_pdfs <- function(article_html, base_url, folder_path, greenlist) {
   # Track downloaded PDFs to avoid duplicates
   downloaded_urls <- character(0)
   pdf_saved <- FALSE
-  
+
   # 1. First check for direct PDF iframes - this is the most common case for AEI
   iframe_elements <- rvest::html_elements(article_html, "iframe")
   if (length(iframe_elements) > 0) {
@@ -194,7 +194,7 @@ handle_pdfs <- function(article_html, base_url, folder_path, greenlist) {
     for (i in seq_along(iframe_elements)) {
       # Get all attributes
       attrs <- rvest::html_attrs(iframe_elements[[i]])
-      
+
       # Check for src attribute that points to PDF
       if ("src" %in% names(attrs)) {
         src <- attrs["src"]
@@ -211,7 +211,7 @@ handle_pdfs <- function(article_html, base_url, folder_path, greenlist) {
           }
         }
       }
-      
+
       # Check for data-src attribute that points to PDF
       if ("data-src" %in% names(attrs)) {
         data_src <- attrs["data-src"]
@@ -230,12 +230,12 @@ handle_pdfs <- function(article_html, base_url, folder_path, greenlist) {
       }
     }
   }
-  
+
   # 2. Check for PDF viewers in iframes if we haven't found direct PDFs
   if (!pdf_saved && length(iframe_elements) > 0) {
     iframe_srcs <- rvest::html_attr(iframe_elements, "src")
     iframe_srcs <- as.character(iframe_srcs[!is.na(iframe_srcs)])
-    
+
     for (src in iframe_srcs) {
       pdf_url <- xml2::url_absolute(src, base_url)
       # For PDF viewers, try to extract the PDF URL
@@ -249,7 +249,7 @@ handle_pdfs <- function(article_html, base_url, folder_path, greenlist) {
           pdf_param <- sub(".*[?&]pdf=([^&]+).*", "\\1", pdf_url)
           pdf_param <- utils::URLdecode(pdf_param)
         }
-        
+
         if (!is.null(pdf_param) && !(pdf_param %in% downloaded_urls)) {
           actual_pdf_url <- xml2::url_absolute(pdf_param, base_url)
           pdf_path <- file.path(folder_path, paste0(n, ".pdf"))
@@ -263,13 +263,13 @@ handle_pdfs <- function(article_html, base_url, folder_path, greenlist) {
       }
     }
   }
-  
+
   # 3. Check for direct PDF links in anchor tags
   a_elements <- rvest::html_elements(article_html, "a[href]")
   if (length(a_elements) > 0) {
     a_hrefs <- rvest::html_attr(a_elements, "href")
     a_hrefs <- as.character(a_hrefs[!is.na(a_hrefs)])
-    
+
     # Look for direct PDF links
     pdf_hrefs <- a_hrefs[grepl("\\.pdf", a_hrefs, ignore.case = TRUE)]
     for (href in pdf_hrefs) {
@@ -285,7 +285,7 @@ handle_pdfs <- function(article_html, base_url, folder_path, greenlist) {
       }
     }
   }
-  
+
   # Return TRUE if we saved any PDFs
   return(pdf_saved)
 }
@@ -296,34 +296,36 @@ handle_pdfs <- function(article_html, base_url, folder_path, greenlist) {
 #' @param target_dir Directory to copy PDFs to
 #'
 #' @return Number of PDFs copied
-copy_pdfs <- function(source_dir = "data/intermed/aei_search_results", 
-                     target_dir = "data/intermed/aei_pdfs") {
+copy_pdfs <- function(
+  source_dir = "data/intermed/aei_search_results",
+  target_dir = "data/intermed/aei_pdfs"
+) {
   # Create target directory if it doesn't exist
   dir.create(target_dir, recursive = TRUE, showWarnings = FALSE)
-  
+
   # Find all PDFs in the source directory
   article_dirs <- list.dirs(source_dir, recursive = FALSE)
   copied_count <- 0
-  
+
   for (article_dir in article_dirs) {
     pdf_files <- list.files(article_dir, pattern = "\\.pdf$", full.names = TRUE)
-    
+
     for (pdf_file in pdf_files) {
       # Get article folder name and PDF filename
       article_name <- basename(article_dir)
       pdf_name <- basename(pdf_file)
-      
+
       # Create a unique name for the PDF in the target directory
       target_name <- paste0(article_name, "_", pdf_name)
       target_path <- file.path(target_dir, target_name)
-      
+
       # Copy the file
       file.copy(pdf_file, target_path, overwrite = TRUE)
       copied_count <- copied_count + 1
       message("Copied PDF: ", target_name)
     }
   }
-  
+
   message("Total PDFs copied: ", copied_count)
   return(invisible(copied_count))
 }
@@ -381,12 +383,20 @@ extract_and_save <- function(
       stop("The pdftools package is required to extract PDF text.")
     }
     pdf_texts <- lapply(pdf_files, function(f) {
-      txt <- tryCatch(pdftools::pdf_text(f), error = function(e) "[PDF extraction failed]")
+      txt <- tryCatch(
+        pdftools::pdf_text(f),
+        error = function(e) "[PDF extraction failed]"
+      )
       paste0("[PDF: ", basename(f), "]\n", paste(txt, collapse = "\n"))
     })
     pdf_text <- paste(pdf_texts, collapse = "\n\n")
     # Append to article_text.txt
-    cat("\n\n--- PDF TEXT ---\n", pdf_text, file = file.path(folder_path, "article_text.txt"), append = TRUE)
+    cat(
+      "\n\n--- PDF TEXT ---\n",
+      pdf_text,
+      file = file.path(folder_path, "article_text.txt"),
+      append = TRUE
+    )
   }
 
   # Create complete metadata object with all required fields
@@ -438,23 +448,33 @@ copy_pdfs <- function(
     recursive = TRUE,
     full.names = TRUE
   )
-  
+
   if (length(pdfs) == 0) {
     message("No PDF files found in ", search_root)
     return(0L)
   }
-  
+
   dir.create(backup_dir, showWarnings = FALSE, recursive = TRUE)
-  
+
   # Create unique filenames by prefixing with folder name
   folder_names <- basename(dirname(pdfs))
-  target_files <- file.path(backup_dir, paste0(folder_names, "_", basename(pdfs)))
-  
+  target_files <- file.path(
+    backup_dir,
+    paste0(folder_names, "_", basename(pdfs))
+  )
+
   # Copy files and count successes
   copy_success <- file.copy(pdfs, target_files, overwrite = TRUE)
   num_copied <- sum(copy_success)
-  
-  message("Copied ", num_copied, " of ", length(pdfs), " PDF files to ", backup_dir)
+
+  message(
+    "Copied ",
+    num_copied,
+    " of ",
+    length(pdfs),
+    " PDF files to ",
+    backup_dir
+  )
   return(num_copied)
 }
 
@@ -499,7 +519,7 @@ scrape_aei <- function(
   # Ensure URLs end with a trailing slash for consistency
   link_vec <- sub("([^/])$", "\\1/", link_vec)
 
-  link_df <- tibble::tibble(
+  link_df <- data.frame(
     links = link_vec,
     folder_name = sapply(link_vec, create_folder_name, USE.NAMES = FALSE)
   )
