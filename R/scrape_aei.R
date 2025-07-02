@@ -344,18 +344,18 @@ scrape_aei <- function(
   # Better filtering of unwanted URLs
   link_vec <- link_vec[
     # Keep only https URLs (or convert http to https)
-    stringr::str_detect(link_vec, "^https?://") &
+    grepl("^https?://", link_vec) &
       # Filter out profile pages, uploads, PDFs, and other non-article pages
-      !stringr::str_detect(link_vec, r"(profile/|uploads/|\.pdf|\.jpg|\.png)") &
+      !grepl("(profile/|uploads/|[.]pdf|[.]jpg|[.]png)", link_vec) &
       # Filter out certain sections that aren't articles
-      !stringr::str_detect(link_vec, "aeideas$")
+      !grepl("aeideas$", link_vec)
   ]
 
   # Convert any http URLs to https
-  link_vec <- stringr::str_replace(link_vec, "^http://", "https://")
+  link_vec <- sub("^http://", "https://", link_vec)
 
   # Ensure URLs end with a trailing slash for consistency
-  link_vec <- stringr::str_replace(link_vec, "([^/])$", "\\1/")
+  link_vec <- sub("([^/])$", "\\1/", link_vec)
 
   link_df <- tibble::tibble(
     links = link_vec,
