@@ -148,7 +148,7 @@ extract_metadata <- function(article_html) {
   author <- gsub("^(By|With) ", "", author)
   author <- gsub("\\|", ", ", author)
 
-  data.frame(title, date, author)
+  tibble::tibble(title = title, date = date, author = author)
 }
 
 first_or <- function(x, default) if (length(x) == 0) default else x[[1]]
@@ -170,14 +170,19 @@ extract_text <- function(article_html) {
 save_pdf <- function(pdf_url, dest_path) {
   res <- tryCatch(
     httr::GET(pdf_url, httr::config(ssl_verifypeer = FALSE), httr::timeout(60)),
-    error = function(e) NULL
+    error = function(e) FALSE
   )
+  if (identical(res, FALSE)) return(FALSE)
   if (!is.null(res) && !httr::http_error(res)) {
-    pdf_content <- httr::content(res, "raw")
-    writeBin(pdf_content, dest_path)
-    return(TRUE)
+    pdf_content <- tryCatch(httr::content(res, "raw"), error = function(e) NULL)
+    if (is.null(pdf_content)) return(FALSE)
+    tryCatch({
+      writeBin(pdf_content, dest_path)
+      TRUE
+    }, error = function(e) FALSE)
+  } else {
+    FALSE
   }
-  return(FALSE)
 }
 
 #' Discover & download PDFs on the page
@@ -202,7 +207,7 @@ handle_pdfs <- function(article_html, base_url, folder_path, greenlist) {
           pdf_url <- xml2::url_absolute(src, base_url)
           if (!(pdf_url %in% downloaded_urls)) {
             pdf_path <- file.path(folder_path, paste0(n, ".pdf"))
-            if (save_pdf(pdf_url, pdf_path)) {
+            if (isTRUE(save_pdf(pdf_url, pdf_path))) {
               message("Saved PDF from iframe: ", basename(pdf_path))
               downloaded_urls <- c(downloaded_urls, pdf_url)
               n <- n + 1L
@@ -219,7 +224,7 @@ handle_pdfs <- function(article_html, base_url, folder_path, greenlist) {
           pdf_url <- xml2::url_absolute(data_src, base_url)
           if (!(pdf_url %in% downloaded_urls)) {
             pdf_path <- file.path(folder_path, paste0(n, ".pdf"))
-            if (save_pdf(pdf_url, pdf_path)) {
+            if (isTRUE(save_pdf(pdf_url, pdf_path))) {
               message("Saved PDF from iframe data-src: ", basename(pdf_path))
               downloaded_urls <- c(downloaded_urls, pdf_url)
               n <- n + 1L
@@ -276,7 +281,7 @@ handle_pdfs <- function(article_html, base_url, folder_path, greenlist) {
       pdf_url <- xml2::url_absolute(href, base_url)
       if (!(pdf_url %in% downloaded_urls)) {
         pdf_path <- file.path(folder_path, paste0(n, ".pdf"))
-        if (save_pdf(pdf_url, pdf_path)) {
+        if (isTRUE(save_pdf(pdf_url, pdf_path))) {
           message("Saved PDF from link: ", basename(pdf_path))
           downloaded_urls <- c(downloaded_urls, pdf_url)
           n <- n + 1L
@@ -288,46 +293,6 @@ handle_pdfs <- function(article_html, base_url, folder_path, greenlist) {
 
   # Return TRUE if we saved any PDFs
   return(pdf_saved)
-}
-
-#' Copy all PDFs in search_results tree to backup directory
-#'
-#' @param source_dir Root directory containing article folders with PDFs
-#' @param target_dir Directory to copy PDFs to
-#'
-#' @return Number of PDFs copied
-copy_pdfs <- function(
-  source_dir = "data/intermed/aei_search_results",
-  target_dir = "data/intermed/aei_pdfs"
-) {
-  # Create target directory if it doesn't exist
-  dir.create(target_dir, recursive = TRUE, showWarnings = FALSE)
-
-  # Find all PDFs in the source directory
-  article_dirs <- list.dirs(source_dir, recursive = FALSE)
-  copied_count <- 0
-
-  for (article_dir in article_dirs) {
-    pdf_files <- list.files(article_dir, pattern = "\\.pdf$", full.names = TRUE)
-
-    for (pdf_file in pdf_files) {
-      # Get article folder name and PDF filename
-      article_name <- basename(article_dir)
-      pdf_name <- basename(pdf_file)
-
-      # Create a unique name for the PDF in the target directory
-      target_name <- paste0(article_name, "_", pdf_name)
-      target_path <- file.path(target_dir, target_name)
-
-      # Copy the file
-      file.copy(pdf_file, target_path, overwrite = TRUE)
-      copied_count <- copied_count + 1
-      message("Copied PDF: ", target_name)
-    }
-  }
-
-  message("Total PDFs copied: ", copied_count)
-  return(invisible(copied_count))
 }
 
 # core ----------------------------------------------------------------------
@@ -457,24 +422,14 @@ copy_pdfs <- function(
   dir.create(backup_dir, showWarnings = FALSE, recursive = TRUE)
 
   # Create unique filenames by prefixing with folder name
-  folder_names <- basename(dirname(pdfs))
+  root_norm <- normalizePath(search_root, winslash = "/", mustWork = FALSE)
+  parent_norm <- normalizePath(dirname(pdfs), winslash = "/", mustWork = FALSE)
   target_files <- file.path(
     backup_dir,
-    paste0(folder_names, "_", basename(pdfs))
+    ifelse(parent_norm == root_norm, basename(pdfs), paste0(basename(dirname(pdfs)), "_", basename(pdfs)))
   )
-
-  # Copy files and count successes
-  copy_success <- file.copy(pdfs, target_files, overwrite = TRUE)
-  num_copied <- sum(copy_success)
-
-  message(
-    "Copied ",
-    num_copied,
-    " of ",
-    length(pdfs),
-    " PDF files to ",
-    backup_dir
-  )
+  num_copied <- sum(file.copy(pdfs, target_files, overwrite = TRUE))
+  message("Copied ", num_copied, " of ", length(pdfs), " PDF files to ", backup_dir)
   return(num_copied)
 }
 
@@ -550,5 +505,5 @@ scrape_aei <- function(
   # 4. backup PDFs -----------------------------------------------------------
   copy_pdfs(output_root)
 
-  invisible(link_df)
+  invisible(tibble::as_tibble(link_df))
 }
