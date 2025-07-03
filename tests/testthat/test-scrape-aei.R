@@ -182,6 +182,20 @@ test_that("scrape_aei downloads real articles for Tobias Peter", {
     # In R, JSON arrays are represented as lists when parsed
     expect_type(json_content$authors, "list")
   }
+
+  # Test that text_corpus_to_df reads all metadata.json files
+  df <- scholarAI::text_corpus_to_df(out_dir)
+  meta_files <- list.files(out_dir, pattern = "^metadata\\.json$", recursive = TRUE, full.names = TRUE)
+  expect_true(nrow(df) >= length(meta_files), "Should have at least one row per metadata.json file")
+  expect_true(all(c("title", "date", "authors", "folder") %in% names(df)),
+              info = "Dataframe should have expected metadata columns")
+
+  # Test that save_corpus_metadata writes corpus_metadata.json
+  out_json <- scholarAI::save_corpus_metadata(out_dir)
+  expect_true(file.exists(out_json), "corpus_metadata.json should be written to output root")
+  json_data <- jsonlite::read_json(out_json, simplifyVector = TRUE)
+  expect_true(is.data.frame(json_data), "JSON output should be a data frame")
+  expect_true(nrow(json_data) >= length(meta_files), "JSON should have at least as many rows as metadata.json files")
 })
 
 ## -------------------------------------------------------------------------
