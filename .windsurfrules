@@ -5,7 +5,7 @@
 - Take your time when writing - read more code, add more to context, consider the workplan
 
 ## Code Structure
-- Package follows standard R package structure, compliant with tidyverse standards
+- Package follows standard R package structure
 - Documentation uses roxygen2 format
 - Test files should be placed in tests/ directory
 - Use pkg::fun inside functions, not library(pkg)
@@ -23,3 +23,8 @@
 ## Testing
 - Use testthat for testing
 - You need Rscript to run R and tests, eg `Rscript -e "devtools::test()"`
+
+## Misc
+- This is not going to CRAN
+- Do not repeat yourself
+- Keep an eye out for duplication or overly verbose code. This makes it harder for me to navigate.
