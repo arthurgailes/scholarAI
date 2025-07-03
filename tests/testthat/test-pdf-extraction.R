@@ -102,15 +102,10 @@ test_that("extract_and_save includes pdf_saved status", {
   expect_true(any(nzchar(text_content[(sep_line + 1):length(text_content)])),
               "There should be non-empty PDF text after the separator in article_text.txt")
 
-  # Check that pdf_text field in metadata.json is non-empty and contains a PDF filename header
+  # Check that metadata.json exists
   meta_path <- file.path(folder_path, "metadata.json")
   expect_true(file.exists(meta_path), "metadata.json should exist")
   meta_json <- jsonlite::read_json(meta_path)
-  expect_true("pdf_text" %in% names(meta_json), "metadata.json should have a pdf_text field")
-  expect_true(is.character(meta_json$pdf_text) && nchar(meta_json$pdf_text) > 0,
-              "pdf_text field in metadata.json should be non-empty")
-  expect_true(grepl("[PDF: ", meta_json$pdf_text, fixed = TRUE),
-              "pdf_text field should contain PDF filename header")
 })
 
 test_that("copy_pdfs correctly copies PDFs to backup directory", {

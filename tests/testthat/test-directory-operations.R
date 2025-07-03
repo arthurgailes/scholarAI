@@ -27,15 +27,16 @@ test_that("scrape_aei creates required directories", {
   tryCatch({
     withr::with_tempdir({
       # Mock the functions used by scrape_aei
-      mockery::stub(scholarAI::scrape_aei, "get_author_links", function(...) {
+      mockery::stub(scholarAI::scrape_aei, "scholarAI::get_author_links", function(...) {
         c("https://www.aei.org/test-article/")
       })
       
-      mockery::stub(scholarAI::scrape_aei, "extract_and_save", function(...) {
-        list(title = "Test", date = "2024-06-30", author = "Test Author")
+      # Now extract_and_save is in aei_extract.R, so we need to mock the fully qualified name
+      mockery::stub(scholarAI::scrape_aei, "scholarAI::extract_and_save", function(...) {
+        list(title = "Test", date = "2024-06-30", author = "Test Author", pdf_saved = FALSE)
       })
       
-      mockery::stub(scholarAI::scrape_aei, "copy_pdfs", function(...) NULL)
+      mockery::stub(scholarAI::scrape_aei, "scholarAI::copy_pdfs", function(...) NULL)
       
       # Run the function
       result <- scholarAI::scrape_aei(authors = "Test", output_root = "test_dir")
