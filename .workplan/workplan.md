@@ -26,12 +26,16 @@
 aeiScholarAI/
   R/
     scrape_aei.R    # rvest scraper for AEI.org
-    embed.R         # text → DuckDB embeddings
+    embed.R         # text → DuckDB embeddings (python?S)
     chat.R          # retrieval-augmented chat
     utils.R         # helper: create_scholar()
   inst/
     skeleton/       # template copied into every scholar workspace
-      build_ai.R
+      data/
+        instructions/
+        corpus/
+        projects/
+        store.duckdb
       custom.R      # user-defined helpers live here
       config.yml
 DESCRIPTION
@@ -97,7 +101,8 @@ make_scholar_helpers <- function() {
   store <- duckdb::dbConnect(duckdb::duckdb(), "store.duckdb")
 
   ask <- function(prompt, ...) {
-    aeiScholarAI::chat(prompt, store = store, ...)
+    source_docs <- scholarAI::query_duckdb_store(prompt)
+    ellmer::chat(prompt, store = store, ...)
   }
   assign("askEd", ask, envir = .GlobalEnv)
 
@@ -119,7 +124,7 @@ Users edit or add functions in this file; no packages to build, nothing to insta
 ---
 
 ## 6 Optional Python (only if needed)
-
+For embeddings, TBD.  
 Add an **environment.yml** next to `build_ai.R`:
 
 ```yaml
@@ -144,31 +149,27 @@ mamba env create -f environment.yml
 A single folder (`~/aei_scholars/ed`) contains:
 
 ```
-data/           # raw HTML, cleaned text
-store.duckdb    # 30–200 MB, portable
-custom.R        # user helpers
+data/instructions/          # system prompts, instructions, etc for context
+data/corpus/                # raw HTML, cleaned text
+projects/**/*               # Individual projects/chats undertaken by the AI.
+store.duckdb                # 30–200 MB, portable
+custom.R                    # user helpers
 ```
 
 Zip it, pass it to a colleague, they unzip and `source("custom.R")`—done.
 
 ---
 
-### Why this fits our constraints
-
-* **No renv / Docker / env-vars** – plain R scripts + a DuckDB file in the same directory.  
-* **Custom helpers** – live in `custom.R`; users add as many as they like.  
-* **Thousands of sub-projects** – any project simply `source()` the helper file; no duplicated installs.  
-* **Credit & maintenance** – the only shared code repo is yours (`aeiScholarAI`). Users reinstall when updates drop.
 
 ---
 
 ### Quick setup checklist
 
-1. `install.packages("duckdb"); remotes::install_github("agailes1/aeiScholarAI")`  
-2. `aeiScholarAI::create_scholar("charles")`  
-3. `setwd("~/aei_scholars/charles"); source("build_ai.R")`  
+1. `remotes::install_github("agailes1/aeiScholarAI")`  
+2. `aeiScholarAI::create_scholar("Edward J. Pinto")`  
+3. `setwd("~/aei_scholars/edward_j_pinto"); source("build_ai.R")`  
 4. `source("custom.R")` in any R session  
-5. Use `askCharles()`, `writeCharlesTwitter()`, etc.
+5. Use `askEd()`, `writeEdOped()`, etc.
 
 > **Result:** Each intern’s workload reduces to a 30-minute “fill in YAML → run script” ritual.  
 > Analysts get lightweight, portable helpers—and you keep ownership of the core code.
