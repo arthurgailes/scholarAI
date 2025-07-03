@@ -250,8 +250,7 @@ extract_and_save <- function(
     title = meta$title,
     link = url,
     location = page_name,
-    text = text,
-    pdf_text = pdf_text,
+    file_path = file.path(folder_path, "article_text.txt"),
     date = meta$date,
     authors = author_list
   )
