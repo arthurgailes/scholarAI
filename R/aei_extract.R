@@ -19,23 +19,22 @@ extract_metadata <- function(article_html) {
   title <- scholarAI::first_or(title_texts, "No Title Found")
 
   # Try to find date
-  possible_tags <- rvest::html_elements(
-    article_html,
-    xpath = "//time|//p|//span|//div"
-  )
-  date_texts <- rvest::html_text(possible_tags, trim = TRUE)
-  date_matches <- date_texts[sapply(
-    date_texts,
-    function(x) grepl(scholarAI::date_patterns(), x)
-  )]
-  date <- scholarAI::first_or(date_matches, "No Date Found")
-
-  # Search inside title as fallback
-  if (
-    identical(date, "No Date Found") &&
-      grepl(scholarAI::date_patterns(), title)
-  )
-    date <- regmatches(title, regexpr(scholarAI::date_patterns(), title))
+  time_tags <- rvest::html_elements(article_html, xpath = "//time")
+  date_texts <- as.character(rvest::html_text(time_tags, trim = TRUE))
+  date_matches <- date_texts[!is.na(date_texts) & vapply(date_texts, function(x) grepl(scholarAI::date_patterns(), x), logical(1))]
+  if (length(date_matches) == 0) {
+    # Fallback: all tags, pick the shortest match
+    possible_tags <- rvest::html_elements(article_html, xpath = "//p|//span|//div")
+    date_texts <- as.character(rvest::html_text(possible_tags, trim = TRUE))
+    date_matches <- date_texts[!is.na(date_texts) & vapply(date_texts, function(x) grepl(scholarAI::date_patterns(), x), logical(1))]
+    if (length(date_matches) > 0) {
+      date <- date_matches[[which.min(nchar(date_matches))]]
+    } else {
+      date <- "No Date Found"
+    }
+  } else {
+    date <- date_matches[[1]]
+  }
 
   # Extract author
   author_elements <- rvest::html_elements(

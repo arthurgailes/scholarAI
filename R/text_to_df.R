@@ -16,7 +16,12 @@ text_corpus_to_df <- function(
   root_dir
 ) {
   # Find all metadata.json files recursively
-  meta_files <- list.files(root_dir, pattern = "^metadata\\.json$", recursive = TRUE, full.names = TRUE)
+  meta_files <- list.files(
+    root_dir,
+    pattern = "^metadata\\.json$",
+    recursive = TRUE,
+    full.names = TRUE
+  )
 
   if (length(meta_files) == 0) {
     cli::cli_warn(c(
@@ -28,18 +33,21 @@ text_corpus_to_df <- function(
 
   # Helper to safely read one metadata.json
   read_meta <- function(path) {
-    tryCatch({
-      meta <- jsonlite::read_json(path, simplifyVector = TRUE)
-      # Always add a column for the folder path
-      meta$folder <- dirname(path)
-      meta
-    }, error = function(e) {
-      cli::cli_warn(c(
-        paste0("! Failed to read metadata: ", path),
-        "i" = e$message
-      ))
-      NULL
-    })
+    tryCatch(
+      {
+        meta <- jsonlite::read_json(path, simplifyVector = TRUE)
+        # Always add a column for the folder path
+        meta$folder <- dirname(path)
+        meta
+      },
+      error = function(e) {
+        cli::cli_warn(c(
+          paste0("! Failed to read metadata: ", path),
+          "i" = e$message
+        ))
+        NULL
+      }
+    )
   }
 
   # Read all metadata
@@ -52,16 +60,22 @@ text_corpus_to_df <- function(
   }
 
   # Bind to dataframe; handle list-columns (e.g. authors)
-  df <- as.data.frame(do.call(rbind, lapply(meta_list, function(x) {
-    # Ensure all fields present as columns
-    fields <- unique(unlist(lapply(meta_list, names)))
-    x[setdiff(fields, names(x))] <- NA
-    # Flatten authors if it's a list
-    if (is.list(x$authors) && !is.character(x$authors)) {
-      x$authors <- paste(unlist(x$authors), collapse = ", ")
-    }
-    x[fields]
-  })), stringsAsFactors = FALSE)
+  df <- as.data.frame(
+    do.call(
+      rbind,
+      lapply(meta_list, function(x) {
+        # Ensure all fields present as columns
+        fields <- unique(unlist(lapply(meta_list, names)))
+        x[setdiff(fields, names(x))] <- NA
+        # Flatten authors if it's a list
+        if (is.list(x$authors) && !is.character(x$authors)) {
+          x$authors <- paste(unlist(x$authors), collapse = ", ")
+        }
+        x[fields]
+      })
+    ),
+    stringsAsFactors = FALSE
+  )
 
   rownames(df) <- NULL
   df
@@ -86,6 +100,6 @@ save_corpus_metadata <- function(
 ) {
   df <- text_corpus_to_df(root_dir)
   out_path <- file.path(root_dir, file_name)
-  yyjsonr::write_json_file(df, out_path)
+  yyjsonr::write_json_file(df, out_path, pretty = TRUE, auto_unbox = TRUE)
   invisible(out_path)
 }

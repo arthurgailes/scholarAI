@@ -189,6 +189,7 @@ test_that("scrape_aei downloads real articles for Tobias Peter", {
   expect_true(nrow(df) >= length(meta_files), "Should have at least one row per metadata.json file")
   expect_true(all(c("title", "date", "authors", "folder") %in% names(df)),
               info = "Dataframe should have expected metadata columns")
+  expect_true(all(nchar(df$date) < 100), "Dates should be short strings, not full article text")
 
   # Test that save_corpus_metadata writes corpus_metadata.json
   out_json <- scholarAI::save_corpus_metadata(out_dir)
