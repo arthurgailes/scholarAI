@@ -2,3 +2,6 @@
 ^\.Rproj\.user$
 ^.windsurfrules$
 ^.workplan
+^exploration
+^conda_env
+^tests/testthat/test_data
