@@ -16,7 +16,7 @@
 * **File layout** – one exported function per file when possible; helpers follow the public function in the same file.  
 * **Function signatures** – first argument is the primary data object; required args have no defaults; wrap long signatures one arg per line with 2-space indents.  
 * **Comments** – explain **why**, not what; sentence-case lines starting with `# ` and separated from code by a blank line.  
-* **Errors & messages** – use `{cli}` bullet-style errors (`cli_abort()` with ✖ / ℹ bullets) for human-centred diagnostics.  
+* **Errors & messages** – use give simple error messages with minimal code.  
 * **API consistency** – design for human-centred, consistent, composable, inclusive interfaces (the four tidy-design principles).  
 * **Documentation & exports** – every public function has a complete roxygen block (`@description`, `@return`, examples) and ends with `@export`; share parameters with `@inheritParams`.  
 
