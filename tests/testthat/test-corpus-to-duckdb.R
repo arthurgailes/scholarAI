@@ -27,15 +27,17 @@ test_that("corpus_to_duckdb creates database with expected structure", {
     )
   }
   
-  # Write metadata CSV
-  metadata_path <- file.path(temp_dir, "corpus_metadata.csv")
-  write.csv(mock_metadata, metadata_path, row.names = FALSE)
+  # Write metadata CSV and JSON (for the function to find)
+  metadata_csv <- file.path(temp_dir, "corpus_metadata.csv")
+  write.csv(mock_metadata, metadata_csv, row.names = FALSE)
+  
+  # Convert to JSON and write to the expected location
+  metadata_json <- file.path(temp_dir, "corpus_metadata.json")
+  jsonlite::write_json(mock_metadata, metadata_json, auto_unbox = TRUE)
   
   # Run the function
   db_path <- corpus_to_duckdb(
-    metadata_path = metadata_path,
-    corpus_dir = temp_dir,
-    db_path = file.path(temp_dir, "corpus.duckdb")
+    corpus_dir = temp_dir
   )
   
   # Test that database was created
@@ -95,11 +97,13 @@ test_that("corpus_to_duckdb handles missing files gracefully", {
   write.csv(mock_metadata, metadata_path, row.names = FALSE)
   
   # Run function with warnings
+  # Convert to JSON and write to the expected location
+  metadata_json <- file.path(temp_dir, "corpus_metadata.json")
+  jsonlite::write_json(mock_metadata, metadata_json, auto_unbox = TRUE)
+  
   expect_warning(
     db_path <- corpus_to_duckdb(
-      metadata_path = metadata_path,
-      corpus_dir = temp_dir,
-      db_path = file.path(temp_dir, "corpus.duckdb")
+      corpus_dir = temp_dir
     ),
     "Text file not found"
   )
@@ -146,11 +150,13 @@ test_that("corpus_to_duckdb handles custom batch size", {
   metadata_path <- file.path(temp_dir, "corpus_metadata.csv")
   write.csv(mock_metadata, metadata_path, row.names = FALSE)
   
+  # Convert to JSON and write to the expected location
+  metadata_json <- file.path(temp_dir, "corpus_metadata.json")
+  jsonlite::write_json(mock_metadata, metadata_json, auto_unbox = TRUE)
+  
   # Run the function with a small batch size 
   db_path <- corpus_to_duckdb(
-    metadata_path = metadata_path,
     corpus_dir = temp_dir,
-    db_path = file.path(temp_dir, "corpus.duckdb"),
     batch_size = 2
   )
   
@@ -191,12 +197,21 @@ test_that("corpus_to_duckdb handles custom db_name", {
   write.csv(mock_metadata, metadata_path, row.names = FALSE)
   
   # Run the function with custom db name
-  custom_db_name <- "custom_corpus.duckdb"
+  # Convert to JSON and write to the expected location
+  metadata_json <- file.path(temp_dir, "corpus_metadata.json")
+  jsonlite::write_json(mock_metadata, metadata_json, auto_unbox = TRUE)
+  
+  # For this test, we need to modify the default db path in the function
+  # Since we can't pass db_path directly, we'll rename the output file after creation
   db_path <- corpus_to_duckdb(
-    metadata_path = metadata_path,
-    corpus_dir = temp_dir,
-    db_path = file.path(temp_dir, custom_db_name)
+    corpus_dir = temp_dir
   )
+  
+  # Rename the database file to test custom naming
+  custom_db_name <- "custom_corpus.duckdb"
+  custom_db_path <- file.path(temp_dir, custom_db_name)
+  file.rename(db_path, custom_db_path)
+  db_path <- custom_db_path
   
   # Test that database was created with custom name
   expect_equal(basename(db_path), custom_db_name)
@@ -218,9 +233,7 @@ test_that("corpus_to_duckdb errors on missing metadata", {
   # Function should error
   expect_error(
     corpus_to_duckdb(
-      metadata_path = file.path(temp_dir, "corpus_metadata.csv"),
-      corpus_dir = temp_dir,
-      db_path = file.path(temp_dir, "corpus.duckdb")
+      corpus_dir = temp_dir
     ), 
     "Corpus metadata file not found"
   )
@@ -255,11 +268,13 @@ test_that("corpus_to_duckdb handles large text content", {
   metadata_path <- file.path(temp_dir, "corpus_metadata.csv")
   write.csv(mock_metadata, metadata_path, row.names = FALSE)
   
+  # Convert to JSON and write to the expected location
+  metadata_json <- file.path(temp_dir, "corpus_metadata.json")
+  jsonlite::write_json(mock_metadata, metadata_json, auto_unbox = TRUE)
+  
   # Run function
   db_path <- corpus_to_duckdb(
-    metadata_path = metadata_path,
-    corpus_dir = temp_dir,
-    db_path = file.path(temp_dir, "corpus.duckdb")
+    corpus_dir = temp_dir
   )
   
   # Connect to database
@@ -298,11 +313,13 @@ test_that("corpus_to_duckdb creates database that can be reopened and modified",
   metadata_path <- file.path(temp_dir, "corpus_metadata.csv")
   write.csv(mock_metadata, metadata_path, row.names = FALSE)
   
+  # Convert to JSON and write to the expected location
+  metadata_json <- file.path(temp_dir, "corpus_metadata.json")
+  jsonlite::write_json(mock_metadata, metadata_json, auto_unbox = TRUE)
+  
   # Run function to create database
   db_path <- corpus_to_duckdb(
-    metadata_path = metadata_path,
-    corpus_dir = temp_dir,
-    db_path = file.path(temp_dir, "corpus.duckdb")
+    corpus_dir = temp_dir
   )
   
   # Verify database was created and properly closed

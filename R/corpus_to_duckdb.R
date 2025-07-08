@@ -1,7 +1,7 @@
 #' After generating the text corpus, this function converts it to a DuckDB database.
 #'
 #' Creates a DuckDB database containing both the corpus metadata and the actual text content
-#' from the file paths. Uses a lazy approach to avoid loading all text into memory at once.
+#' from the file paths. Uses DuckDB's native JSON functions to efficiently load data.
 #' Stores everything in a single table for efficient columnar storage.
 #'
 #' @param corpus_dir Directory containing the corpus text files
@@ -10,7 +10,7 @@
 #'         Use `DBI::dbConnect(duckdb::duckdb(), "path/to/database.duckdb")` to connect to the database
 #'
 #' @examples
-#' # corpus_to_duckdb(metadata_path = "metadata.csv", corpus_dir = "corpus", db_path = "corpus.duckdb")
+#' # corpus_to_duckdb(corpus_dir = "corpus")
 #' @export
 corpus_to_duckdb <- function(
   corpus_dir,
@@ -24,8 +24,11 @@ corpus_to_duckdb <- function(
     ))
   }
 
-  # Check for corpus metadata
+  # Set default paths
   metadata_path <- file.path(corpus_dir, "corpus_metadata.json")
+  db_path <- file.path(corpus_dir, "corpus.duckdb")
+
+  # Check for corpus metadata
   if (!file.exists(metadata_path)) {
     cli::cli_abort(c(
       "x" = "Corpus metadata file not found.",
@@ -33,33 +36,75 @@ corpus_to_duckdb <- function(
     ))
   }
 
-  db_path <- file.path(corpus_dir, "corpus.duckdb")
-
   # Connect to DuckDB
   cli::cli_alert_info("Creating DuckDB database at {.file {db_path}}")
   con <- DBI::dbConnect(duckdb::duckdb(), db_path)
   on.exit(DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
 
-  # Load metadata
-  cli::cli_alert_info("Loading corpus metadata")
-  metadata <- yyjsonr::read_json_file(metadata_path)
-
-  # Create corpus table
-  cli::cli_alert_info("Creating corpus table")
-
-  # First create an empty table with the right schema
-  # We'll add text content to this table in batches
-  metadata$file_path <- NA_character_
-  metadata$content <- NA_character_
-  print(sapply(metadata, class))
-
-  DBI::dbWriteTable(con, "corpus", metadata, overwrite = TRUE)
-
-  # Remove the placeholder rows
-  DBI::dbExecute(con, "DELETE FROM corpus")
+  # Load metadata directly into DuckDB
+  cli::cli_alert_info("Loading corpus metadata directly into DuckDB")
+  
+  # Determine file type based on extension
+  file_ext <- tolower(tools::file_ext(metadata_path))
+  
+  if (file_ext == "json") {
+    # Create corpus table using DuckDB's JSON functions
+    cli::cli_alert_info("Creating corpus table from JSON")
+    
+    # Load DuckDB JSON extension
+    tryCatch({
+      DBI::dbExecute(con, "LOAD json;")
+    }, error = function(e) {
+      # If the extension isn't loaded, try to install it
+      DBI::dbExecute(con, "INSTALL json;")
+      DBI::dbExecute(con, "LOAD json;")
+    })
+    
+    # Create the table from the JSON file
+    create_table_sql <- sprintf(
+      "CREATE TABLE corpus AS SELECT * FROM read_json('%s', auto_detect=true);",
+      metadata_path
+    )
+    DBI::dbExecute(con, create_table_sql)
+    
+    # Add columns for file_path and content
+    DBI::dbExecute(con, "ALTER TABLE corpus ADD COLUMN IF NOT EXISTS file_path VARCHAR;")
+    DBI::dbExecute(con, "ALTER TABLE corpus ADD COLUMN IF NOT EXISTS content VARCHAR;")
+  } else if (file_ext == "csv") {
+    # Create corpus table using DuckDB's CSV functions
+    cli::cli_alert_info("Creating corpus table from CSV")
+    
+    # Create the table from the CSV file
+    create_table_sql <- sprintf(
+      "CREATE TABLE corpus AS SELECT * FROM read_csv_auto('%s');",
+      metadata_path
+    )
+    DBI::dbExecute(con, create_table_sql)
+    
+    # Add columns for file_path and content
+    DBI::dbExecute(con, "ALTER TABLE corpus ADD COLUMN IF NOT EXISTS file_path VARCHAR;")
+    DBI::dbExecute(con, "ALTER TABLE corpus ADD COLUMN IF NOT EXISTS content VARCHAR;")
+  } else {
+    # Fall back to R-based loading for other formats
+    cli::cli_alert_info("Loading metadata using R")
+    
+    if (file_ext == "json") {
+      metadata <- yyjsonr::read_json_file(metadata_path)
+    } else {
+      metadata <- utils::read.csv(metadata_path, stringsAsFactors = FALSE)
+    }
+    
+    # Add placeholder columns
+    metadata$file_path <- NA_character_
+    metadata$content <- NA_character_
+    
+    # Write to DuckDB
+    DBI::dbWriteTable(con, "corpus", metadata, overwrite = TRUE)
+  }
 
   # Prepare for batch processing
-  total_docs <- nrow(metadata)
+  # Get the total number of documents from the database
+  total_docs <- DBI::dbGetQuery(con, "SELECT COUNT(*) FROM corpus")[[1]]
   batches <- ceiling(total_docs / batch_size)
 
   cli::cli_alert_info("Processing {total_docs} documents in {batches} batches")
@@ -74,40 +119,59 @@ corpus_to_duckdb <- function(
 
   # Process in batches to keep memory usage low
   for (i in seq_len(batches)) {
-    start_idx <- (i - 1) * batch_size + 1
-    end_idx <- min(i * batch_size, total_docs)
-    batch_metadata <- metadata[start_idx:end_idx, ]
-
-    # Get the batch of metadata
-    batch_data <- batch_metadata
-
-    # Add columns for file_path and content
-    batch_data$file_path <- NA_character_
-    batch_data$content <- NA_character_
+    # Calculate offset for SQL query (SQL uses 0-based indexing for OFFSET)
+    offset <- (i - 1) * batch_size
+    
+    # Get the batch of metadata from the database
+    batch_query <- sprintf(
+      "SELECT * FROM corpus LIMIT %d OFFSET %d",
+      batch_size, offset
+    )
+    batch_data <- DBI::dbGetQuery(con, batch_query)
 
     # Process each document in the batch
     for (j in seq_len(nrow(batch_data))) {
-      folder <- batch_data$folder[j]
-      text_file <- file.path(folder, "text.txt")
+      if ("folder" %in% names(batch_data)) {
+        folder <- batch_data$folder[j]
+        text_file <- file.path(folder, "text.txt")
 
-      if (file.exists(text_file)) {
-        # Read text content
-        text_content <- readLines(text_file, warn = FALSE)
-        text_content <- paste(text_content, collapse = "\n")
+        if (file.exists(text_file)) {
+          # Read text content
+          text_content <- readLines(text_file, warn = FALSE)
+          text_content <- paste(text_content, collapse = "\n")
 
-        # Update batch data
-        batch_data$file_path[j] <- text_file
-        batch_data$content[j] <- text_content
+          # Update batch data
+          batch_data$file_path[j] <- text_file
+          batch_data$content[j] <- text_content
+        } else {
+          cli::cli_warn(c(
+            "!" = "Text file not found for document {offset + j}.",
+            "i" = paste0("Expected: ", text_file)
+          ))
+        }
       } else {
         cli::cli_warn(c(
-          "!" = "Text file not found for document {start_idx + j - 1}.",
-          "i" = paste0("Expected: ", text_file)
+          "!" = "Missing 'folder' column in metadata.",
+          "i" = "Cannot locate text files without folder information."
         ))
+        break
       }
     }
 
-    # Insert batch into database
-    DBI::dbAppendTable(con, "corpus", batch_data)
+    # Update the database with the content
+    for (j in seq_len(nrow(batch_data))) {
+      # Use parameterized query to safely handle text content
+      update_query <- "UPDATE corpus SET file_path = ?, content = ? WHERE folder = ?;"
+      DBI::dbExecute(
+        con, 
+        update_query, 
+        params = list(
+          batch_data$file_path[j], 
+          batch_data$content[j], 
+          batch_data$folder[j]
+        )
+      )
+    }
 
     # Report progress
     cli::cli_progress_update(set = i)
