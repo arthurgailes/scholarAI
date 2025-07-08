@@ -18,10 +18,10 @@
 #' \dontrun{
 #' # Set API key in environment variable first
 #' Sys.setenv(OPENAI_API_KEY = "your-api-key")
-#' 
+#'
 #' # Generate embeddings for corpus
 #' con <- corpus_embeddings("path/to/corpus.duckdb")
-#' 
+#'
 #' # Query similar documents
 #' query <- "climate change policy"
 #' query_embedding <- get_text_embedding(query)
@@ -75,10 +75,10 @@ corpus_embeddings <- function(
 
   # Set up Python environment and OpenAI
   cli::cli_alert_info("Setting up Python environment for OpenAI")
-  
+
   # Import OpenAI (py_require called in .onLoad)
   openai <- reticulate::import("openai", convert = FALSE)
-  
+
   # Set API key
   if (!is.null(api_key)) {
     openai$api_key <- api_key
@@ -94,30 +94,39 @@ corpus_embeddings <- function(
   # Add Vector Similarity Search extension if requested
   if (add_vss) {
     cli::cli_alert_info("Adding Vector Similarity Search extension to DuckDB")
-    tryCatch({
-      DBI::dbExecute(con, "INSTALL VSS")
-      DBI::dbExecute(con, "LOAD VSS")
-    }, error = function(e) {
-      cli::cli_warn(c(
-        "!" = "Failed to install or load VSS extension.",
-        "i" = "You may need to manually install it or use a newer version of DuckDB."
-      ))
-    })
+    tryCatch(
+      {
+        DBI::dbExecute(con, "INSTALL VSS")
+        DBI::dbExecute(con, "LOAD VSS")
+      },
+      error = function(e) {
+        cli::cli_warn(c(
+          "!" = "Failed to install or load VSS extension.",
+          "i" = "You may need to manually install it or use a newer version of DuckDB."
+        ))
+      }
+    )
   }
 
   # Check if embeddings table exists, create if not
   if (!"embeddings" %in% tables) {
     cli::cli_alert_info("Creating embeddings table")
-    DBI::dbExecute(con, paste0(
-      "CREATE TABLE embeddings (",
-      "id INTEGER, ",
-      "embedding FLOAT[]",
-      ")"
-    ))
+    DBI::dbExecute(
+      con,
+      paste0(
+        "CREATE TABLE embeddings (",
+        "id INTEGER, ",
+        "embedding FLOAT[]",
+        ")"
+      )
+    )
   }
 
   # Get total number of documents
-  total_docs <- DBI::dbGetQuery(con, "SELECT COUNT(*) as count FROM corpus")$count
+  total_docs <- DBI::dbGetQuery(
+    con,
+    "SELECT COUNT(*) as count FROM corpus"
+  )$count
   batches <- ceiling(total_docs / batch_size)
 
   cli::cli_alert_info("Processing {total_docs} documents in {batches} batches")
@@ -134,55 +143,65 @@ corpus_embeddings <- function(
   for (i in seq_len(batches)) {
     start_idx <- (i - 1) * batch_size + 1
     end_idx <- min(i * batch_size, total_docs)
-    
+
     # Get batch of text content
     query <- paste0(
       "SELECT rowid, content FROM corpus ",
-      "WHERE rowid BETWEEN ", start_idx, " AND ", end_idx,
+      "WHERE rowid BETWEEN ",
+      start_idx,
+      " AND ",
+      end_idx,
       " AND content IS NOT NULL"
     )
     batch_data <- DBI::dbGetQuery(con, query)
-    
+
     if (nrow(batch_data) > 0) {
       # Generate embeddings for batch
       embeddings <- generate_embeddings(batch_data$content, model, openai)
-      
+
       # Prepare data for insertion
       embedding_data <- data.frame(
         id = batch_data$rowid,
         embedding = I(embeddings)
       )
-      
+
       # Insert embeddings into database
       DBI::dbWriteTable(con, "embeddings", embedding_data, append = TRUE)
     }
-    
+
     # Update progress bar
     cli::cli_progress_update(set = i)
   }
 
   # Create index for faster similarity search if VSS is available
-  tryCatch({
-    cli::cli_alert_info("Creating vector similarity search index")
-    DBI::dbExecute(con, paste0(
-      "CREATE INDEX IF NOT EXISTS embedding_idx ",
-      "ON embeddings USING VSS (embedding) ",
-      "WITH (dimensions=", dimensions, ")"
-    ))
-  }, error = function(e) {
-    cli::cli_warn(c(
-      "!" = "Failed to create VSS index.",
-      "i" = "Vector similarity searches may be slower."
-    ))
-  })
+  tryCatch(
+    {
+      cli::cli_alert_info("Creating vector similarity search index")
+      DBI::dbExecute(
+        con,
+        paste0(
+          "CREATE INDEX IF NOT EXISTS embedding_idx ",
+          "ON embeddings USING VSS (embedding) ",
+          "WITH (dimensions=",
+          dimensions,
+          ")"
+        )
+      )
+    },
+    error = function(e) {
+      cli::cli_warn(c(
+        "!" = "Failed to create VSS index.",
+        "i" = "Vector similarity searches may be slower."
+      ))
+    }
+  )
 
   cli::cli_alert_success(
     "Successfully generated embeddings for corpus in {.file {db_path}}"
   )
-  
+
   invisible(con)
 }
-
 
 
 #' Generate embeddings for a batch of texts
@@ -192,27 +211,31 @@ corpus_embeddings <- function(
 #' @param openai OpenAI Python module
 #' @return List of numeric vectors representing embeddings
 #' @keywords internal
-generate_embeddings <- function(texts, model = "text-embedding-3-small", openai = NULL) {
+generate_embeddings <- function(
+  texts,
+  model = "text-embedding-3-small",
+  openai = NULL
+) {
   # Import OpenAI if not provided
   if (is.null(openai)) {
     openai <- reticulate::import("openai", convert = FALSE)
   }
-  
+
   # Generate embeddings
   response <- openai$embeddings$create(
     input = texts,
     model = model
   )
-  
+
   # Extract embeddings from response
   # Use py_to_r to convert Python objects to R
   embeddings <- reticulate::py_to_r(response$data)
-  
+
   # Convert to list of numeric vectors
   embedding_list <- lapply(embeddings, function(item) {
     item$embedding
   })
-  
+
   return(embedding_list)
 }
 
@@ -225,7 +248,7 @@ generate_embeddings <- function(texts, model = "text-embedding-3-small", openai 
 get_text_embedding <- function(text, model = "text-embedding-3-small") {
   # Import OpenAI (py_require called in .onLoad)
   openai <- reticulate::import("openai", convert = FALSE)
-  
+
   # Check for API key
   if (Sys.getenv("OPENAI_API_KEY") == "") {
     cli::cli_abort(c(
@@ -233,10 +256,10 @@ get_text_embedding <- function(text, model = "text-embedding-3-small") {
       "i" = "Set OPENAI_API_KEY environment variable."
     ))
   }
-  
+
   # Generate embedding
   embeddings <- generate_embeddings(list(text), model, openai)
-  
+
   # Return the first (and only) embedding
   return(embeddings[[1]])
 }
@@ -263,83 +286,104 @@ find_similar_documents <- function(
       "i" = "Run corpus_embeddings() first to generate embeddings."
     ))
   }
-  
+
   # Convert embedding to string format for DuckDB
   embedding_str <- paste0(
-    "[", paste(query_embedding, collapse = ","), "]"
+    "[",
+    paste(query_embedding, collapse = ","),
+    "]"
   )
-  
+
   # Try using VSS for fast similarity search
-  tryCatch({
-    query <- paste0(
-      "SELECT e.id, c.title, c.url, ",
-      "cosine_similarity(e.embedding, ", embedding_str, ") AS similarity ",
-      "FROM embeddings e ",
-      "JOIN corpus c ON e.id = c.rowid ",
-      "WHERE cosine_similarity(e.embedding, ", embedding_str, ") >= ", min_similarity, " ",
-      "ORDER BY similarity DESC ",
-      "LIMIT ", limit
-    )
-    
-    results <- DBI::dbGetQuery(con, query)
-    
-    if (nrow(results) == 0) {
-      cli::cli_alert_info("No similar documents found above similarity threshold {min_similarity}.")
-    }
-    
-    return(results)
-  }, error = function(e) {
-    cli::cli_warn(c(
-      "!" = "VSS similarity search failed. Falling back to slower method.",
-      "i" = "Error: {as.character(e)}"
-    ))
-    
-    # Fallback to manual calculation if VSS fails
-    query <- paste0(
-      "SELECT e.id, e.embedding ",
-      "FROM embeddings e"
-    )
-    
-    all_embeddings <- DBI::dbGetQuery(con, query)
-    
-    # Calculate similarities manually
-    similarities <- sapply(seq_len(nrow(all_embeddings)), function(i) {
-      emb <- unlist(all_embeddings$embedding[i])
-      cosine_similarity(query_embedding, emb)
-    })
-    
-    # Create results data frame
-    results <- data.frame(
-      id = all_embeddings$id,
-      similarity = similarities
-    )
-    
-    # Filter by minimum similarity
-    results <- results[results$similarity >= min_similarity, ]
-    
-    # Sort by similarity (descending)
-    results <- results[order(results$similarity, decreasing = TRUE), ]
-    
-    # Limit results
-    if (nrow(results) > limit) {
-      results <- results[1:limit, ]
-    }
-    
-    # Join with corpus data
-    if (nrow(results) > 0) {
-      ids_str <- paste(results$id, collapse = ",")
-      corpus_data <- DBI::dbGetQuery(con, paste0(
-        "SELECT rowid, title, url FROM corpus ",
-        "WHERE rowid IN (", ids_str, ")"
+  tryCatch(
+    {
+      query <- paste0(
+        "SELECT e.id, c.title, c.url, ",
+        "cosine_similarity(e.embedding, ",
+        embedding_str,
+        ") AS similarity ",
+        "FROM embeddings e ",
+        "JOIN corpus c ON e.id = c.rowid ",
+        "WHERE cosine_similarity(e.embedding, ",
+        embedding_str,
+        ") >= ",
+        min_similarity,
+        " ",
+        "ORDER BY similarity DESC ",
+        "LIMIT ",
+        limit
+      )
+
+      results <- DBI::dbGetQuery(con, query)
+
+      if (nrow(results) == 0) {
+        cli::cli_alert_info(
+          "No similar documents found above similarity threshold {min_similarity}."
+        )
+      }
+
+      return(results)
+    },
+    error = function(e) {
+      cli::cli_warn(c(
+        "!" = "VSS similarity search failed. Falling back to slower method.",
+        "i" = "Error: {as.character(e)}"
       ))
-      
-      results <- merge(results, corpus_data, by.x = "id", by.y = "rowid")
-    } else {
-      cli::cli_alert_info("No similar documents found above similarity threshold {min_similarity}.")
+
+      # Fallback to manual calculation if VSS fails
+      query <- paste0(
+        "SELECT e.id, e.embedding ",
+        "FROM embeddings e"
+      )
+
+      all_embeddings <- DBI::dbGetQuery(con, query)
+
+      # Calculate similarities manually
+      similarities <- sapply(seq_len(nrow(all_embeddings)), function(i) {
+        emb <- unlist(all_embeddings$embedding[i])
+        cosine_similarity(query_embedding, emb)
+      })
+
+      # Create results data frame
+      results <- data.frame(
+        id = all_embeddings$id,
+        similarity = similarities
+      )
+
+      # Filter by minimum similarity
+      results <- results[results$similarity >= min_similarity, ]
+
+      # Sort by similarity (descending)
+      results <- results[order(results$similarity, decreasing = TRUE), ]
+
+      # Limit results
+      if (nrow(results) > limit) {
+        results <- results[1:limit, ]
+      }
+
+      # Join with corpus data
+      if (nrow(results) > 0) {
+        ids_str <- paste(results$id, collapse = ",")
+        corpus_data <- DBI::dbGetQuery(
+          con,
+          paste0(
+            "SELECT rowid, title, url FROM corpus ",
+            "WHERE rowid IN (",
+            ids_str,
+            ")"
+          )
+        )
+
+        results <- merge(results, corpus_data, by.x = "id", by.y = "rowid")
+      } else {
+        cli::cli_alert_info(
+          "No similar documents found above similarity threshold {min_similarity}."
+        )
+      }
+
+      return(results)
     }
-    
-    return(results)
-  })
+  )
 }
 
 #' Calculate cosine similarity between two vectors
@@ -352,14 +396,14 @@ cosine_similarity <- function(a, b) {
   # Convert inputs to numeric vectors if needed
   a <- as.numeric(a)
   b <- as.numeric(b)
-  
+
   # Calculate cosine similarity
   dot_product <- sum(a * b)
   norm_a <- sqrt(sum(a^2))
   norm_b <- sqrt(sum(b^2))
-  
+
   similarity <- dot_product / (norm_a * norm_b)
-  
+
   return(similarity)
 }
 
