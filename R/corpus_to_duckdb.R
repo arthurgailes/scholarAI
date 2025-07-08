@@ -1,58 +1,39 @@
 #' After generating the text corpus, this function converts it to a DuckDB database.
 #'
-#' Creates a DuckDB database at the output directory root containing both the corpus metadata
-#' and the actual text content from the file paths. Uses a lazy approach to avoid loading
-#' all text into memory at once. Stores everything in a single table for efficient columnar storage.
+#' Creates a DuckDB database containing both the corpus metadata and the actual text content
+#' from the file paths. Uses a lazy approach to avoid loading all text into memory at once.
+#' Stores everything in a single table for efficient columnar storage.
 #'
-#' @param output_dir The directory containing the corpus metadata and text files
-#' @param db_name The name of the DuckDB database file (default: "corpus.duckdb")
+#' @param corpus_dir Directory containing the corpus text files
+#' @param db_path Path where the DuckDB database will be created
 #' @param batch_size Number of documents to process in each batch (default: 100)
 #' @return Invisibly returns the path to the created DuckDB database
 #'         Use `DBI::dbConnect(duckdb::duckdb(), "path/to/database.duckdb")` to connect to the database
 #'
 #' @examples
-#' # corpus_to_duckdb("my_results")
+#' # corpus_to_duckdb(metadata_path = "metadata.csv", corpus_dir = "corpus", db_path = "corpus.duckdb")
 #' @export
 corpus_to_duckdb <- function(
-  output_dir,
-  db_name = "corpus.duckdb",
+  corpus_dir,
+  db_path,
   batch_size = 100
 ) {
-  # Check for required packages
-  if (!requireNamespace("duckdb", quietly = TRUE)) {
+  # Check if corpus_dir exists
+  if (!dir.exists(corpus_dir)) {
     cli::cli_abort(c(
-      "x" = "Package 'duckdb' is required but not installed.",
-      "i" = "Install it with: install.packages('duckdb')"
-    ))
-  }
-
-  if (!requireNamespace("DBI", quietly = TRUE)) {
-    cli::cli_abort(c(
-      "x" = "Package 'DBI' is required but not installed.",
-      "i" = "Install it with: install.packages('DBI')"
-    ))
-  }
-
-  # Check if output_dir exists
-  if (!dir.exists(output_dir)) {
-    cli::cli_abort(c(
-      "x" = "Output directory does not exist.",
-      "i" = paste0("Checked: ", output_dir)
+      "x" = "Corpus directory does not exist.",
+      "i" = paste0("Checked: ", corpus_dir)
     ))
   }
 
   # Check for corpus metadata
-  metadata_path <- file.path(output_dir, "corpus_metadata.json")
+  metadata_path <- file.path(corpus_path, "coprus_metadata.json")
   if (!file.exists(metadata_path)) {
     cli::cli_abort(c(
       "x" = "Corpus metadata file not found.",
-      "i" = paste0("Expected: ", metadata_path),
-      "i" = "Run save_corpus_metadata() first."
+      "i" = paste("Expected: ", metadata_path, ". Run save_corpus_metadata")
     ))
   }
-
-  # Create database path
-  db_path <- file.path(output_dir, db_name)
 
   # Connect to DuckDB
   cli::cli_alert_info("Creating DuckDB database at {.file {db_path}}")
@@ -61,7 +42,7 @@ corpus_to_duckdb <- function(
 
   # Load metadata
   cli::cli_alert_info("Loading corpus metadata")
-  metadata <- jsonlite::read_json(metadata_path, simplifyVector = TRUE)
+  metadata <- yyjsonr::read_json_file(metadata_path)
 
   # Create corpus table
   cli::cli_alert_info("Creating corpus table")

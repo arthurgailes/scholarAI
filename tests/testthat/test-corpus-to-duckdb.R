@@ -27,16 +27,16 @@ test_that("corpus_to_duckdb creates database with expected structure", {
     )
   }
   
-  # Write metadata JSON
-  yyjsonr::write_json_file(
-    mock_metadata, 
-    file.path(temp_dir, "corpus_metadata.json"),
-    pretty = TRUE,
-    auto_unbox = TRUE
-  )
+  # Write metadata CSV
+  metadata_path <- file.path(temp_dir, "corpus_metadata.csv")
+  write.csv(mock_metadata, metadata_path, row.names = FALSE)
   
   # Run the function
-  db_path <- corpus_to_duckdb(temp_dir)
+  db_path <- corpus_to_duckdb(
+    metadata_path = metadata_path,
+    corpus_dir = temp_dir,
+    db_path = file.path(temp_dir, "corpus.duckdb")
+  )
   
   # Test that database was created
   expect_true(file.exists(db_path))
@@ -90,17 +90,17 @@ test_that("corpus_to_duckdb handles missing files gracefully", {
   dir.create(mock_metadata$folder[2], recursive = TRUE)
   # Deliberately not creating text.txt for the second article
   
-  # Write metadata JSON
-  yyjsonr::write_json_file(
-    mock_metadata, 
-    file.path(temp_dir, "corpus_metadata.json"),
-    pretty = TRUE,
-    auto_unbox = TRUE
-  )
+  # Write metadata CSV
+  metadata_path <- file.path(temp_dir, "corpus_metadata.csv")
+  write.csv(mock_metadata, metadata_path, row.names = FALSE)
   
   # Run function with warnings
   expect_warning(
-    db_path <- corpus_to_duckdb(temp_dir),
+    db_path <- corpus_to_duckdb(
+      metadata_path = metadata_path,
+      corpus_dir = temp_dir,
+      db_path = file.path(temp_dir, "corpus.duckdb")
+    ),
     "Text file not found"
   )
   
@@ -142,16 +142,17 @@ test_that("corpus_to_duckdb handles custom batch size", {
     )
   }
   
-  # Write metadata JSON
-  yyjsonr::write_json_file(
-    mock_metadata, 
-    file.path(temp_dir, "corpus_metadata.json"),
-    pretty = TRUE,
-    auto_unbox = TRUE
-  )
+  # Write metadata CSV
+  metadata_path <- file.path(temp_dir, "corpus_metadata.csv")
+  write.csv(mock_metadata, metadata_path, row.names = FALSE)
   
   # Run the function with a small batch size 
-  db_path <- corpus_to_duckdb(temp_dir, batch_size = 2)
+  db_path <- corpus_to_duckdb(
+    metadata_path = metadata_path,
+    corpus_dir = temp_dir,
+    db_path = file.path(temp_dir, "corpus.duckdb"),
+    batch_size = 2
+  )
   
   # Connect to database
   con <- DBI::dbConnect(duckdb::duckdb(), db_path)
@@ -185,17 +186,17 @@ test_that("corpus_to_duckdb handles custom db_name", {
   dir.create(mock_metadata$folder[1], recursive = TRUE)
   writeLines("This is the content of article 1", file.path(mock_metadata$folder[1], "text.txt"))
   
-  # Write metadata JSON
-  yyjsonr::write_json_file(
-    mock_metadata, 
-    file.path(temp_dir, "corpus_metadata.json"),
-    pretty = TRUE,
-    auto_unbox = TRUE
-  )
+  # Write metadata CSV
+  metadata_path <- file.path(temp_dir, "corpus_metadata.csv")
+  write.csv(mock_metadata, metadata_path, row.names = FALSE)
   
   # Run the function with custom db name
   custom_db_name <- "custom_corpus.duckdb"
-  db_path <- corpus_to_duckdb(temp_dir, db_name = custom_db_name)
+  db_path <- corpus_to_duckdb(
+    metadata_path = metadata_path,
+    corpus_dir = temp_dir,
+    db_path = file.path(temp_dir, custom_db_name)
+  )
   
   # Test that database was created with custom name
   expect_equal(basename(db_path), custom_db_name)
@@ -215,7 +216,14 @@ test_that("corpus_to_duckdb errors on missing metadata", {
   # No metadata.json file created
   
   # Function should error
-  expect_error(corpus_to_duckdb(temp_dir), "Corpus metadata file not found")
+  expect_error(
+    corpus_to_duckdb(
+      metadata_path = file.path(temp_dir, "corpus_metadata.csv"),
+      corpus_dir = temp_dir,
+      db_path = file.path(temp_dir, "corpus.duckdb")
+    ), 
+    "Corpus metadata file not found"
+  )
 })
 
 test_that("corpus_to_duckdb handles large text content", {
@@ -243,11 +251,16 @@ test_that("corpus_to_duckdb handles large text content", {
   # Write text file
   writeLines(large_text, file.path(mock_metadata$folder, "text.txt"))
   
-  # Write metadata file
-  jsonlite::write_json(mock_metadata, file.path(temp_dir, "corpus_metadata.json"))
+  # Write metadata CSV
+  metadata_path <- file.path(temp_dir, "corpus_metadata.csv")
+  write.csv(mock_metadata, metadata_path, row.names = FALSE)
   
   # Run function
-  db_path <- corpus_to_duckdb(temp_dir)
+  db_path <- corpus_to_duckdb(
+    metadata_path = metadata_path,
+    corpus_dir = temp_dir,
+    db_path = file.path(temp_dir, "corpus.duckdb")
+  )
   
   # Connect to database
   con <- DBI::dbConnect(duckdb::duckdb(), db_path)
@@ -281,42 +294,49 @@ test_that("corpus_to_duckdb creates database that can be reopened and modified",
   # Write text file
   writeLines("Initial content", file.path(mock_metadata$folder, "text.txt"))
   
-  # Write metadata file
-  jsonlite::write_json(mock_metadata, file.path(temp_dir, "corpus_metadata.json"))
+  # Write metadata CSV
+  metadata_path <- file.path(temp_dir, "corpus_metadata.csv")
+  write.csv(mock_metadata, metadata_path, row.names = FALSE)
   
   # Run function to create database
-  db_path <- corpus_to_duckdb(temp_dir)
+  db_path <- corpus_to_duckdb(
+    metadata_path = metadata_path,
+    corpus_dir = temp_dir,
+    db_path = file.path(temp_dir, "corpus.duckdb")
+  )
   
   # Verify database was created and properly closed
   expect_true(file.exists(db_path))
   
-  # Connect to the database again
-  con <- DBI::dbConnect(duckdb::duckdb(), db_path)
-  on.exit(DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
-  
-  # Read initial data
-  initial_data <- DBI::dbReadTable(con, "corpus")
-  expect_equal(nrow(initial_data), 1)
-  expect_equal(initial_data$content[1], "Initial content")
-  
-  # Add new data
-  new_data <- data.frame(
-    folder = file.path(temp_dir, "article2"),
-    title = "Test Article 2",
-    file_path = file.path(temp_dir, "article2", "text.txt"),
-    content = "New content",
-    stringsAsFactors = FALSE
-  )
-  
-  # Append to the table
-  DBI::dbAppendTable(con, "corpus", new_data)
-  
-  # Read updated data
-  updated_data <- DBI::dbReadTable(con, "corpus")
-  expect_equal(nrow(updated_data), 2)
-  
-  # Close connection
-  DBI::dbDisconnect(con, shutdown = TRUE)
+  # Use a separate block for the first connection
+  {
+    # Connect to the database again
+    con <- DBI::dbConnect(duckdb::duckdb(), db_path)
+    
+    # Read initial data
+    initial_data <- DBI::dbReadTable(con, "corpus")
+    expect_equal(nrow(initial_data), 1)
+    expect_equal(initial_data$content[1], "Initial content")
+    
+    # Add new data
+    new_data <- data.frame(
+      folder = file.path(temp_dir, "article2"),
+      title = "Test Article 2",
+      file_path = file.path(temp_dir, "article2", "text.txt"),
+      content = "New content",
+      stringsAsFactors = FALSE
+    )
+    
+    # Append to the table
+    DBI::dbAppendTable(con, "corpus", new_data)
+    
+    # Read updated data
+    updated_data <- DBI::dbReadTable(con, "corpus")
+    expect_equal(nrow(updated_data), 2)
+    
+    # Close connection
+    DBI::dbDisconnect(con, shutdown = TRUE)
+  }
   
   # Reopen connection to verify changes persisted
   con2 <- DBI::dbConnect(duckdb::duckdb(), db_path)

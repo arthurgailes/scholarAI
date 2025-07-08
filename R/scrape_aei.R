@@ -81,7 +81,6 @@ get_author_links <- function(author_slug, max_pages = 2000, progress = TRUE) {
 #'
 #' @return Named list with title, date, author, and pdf_saved status.
 
-
 #' Copy all PDFs in search_results tree to backup directory
 #'
 #' @param search_root Directory to search for PDFs.
@@ -157,8 +156,12 @@ scrape_aei <- function(
   link_vec <- sub("([^/])$", "\\1/", link_vec)
 
   link_df <- data.frame(
-    links = link_vec,
-    folder_name = sapply(link_vec, scholarAI::create_folder_name, USE.NAMES = FALSE)
+    url = link_vec,
+    folder_name = sapply(
+      link_vec,
+      scholarAI::create_folder_name,
+      USE.NAMES = FALSE
+    )
   )
   write.csv(
     link_df,
@@ -171,7 +174,11 @@ scrape_aei <- function(
   meta_list <- vector("list", nrow(link_df))
   for (i in seq_len(nrow(link_df))) {
     pb$tick()
-    meta_list[[i]] <- scholarAI::extract_and_save(link_df$links[i], output_root, greenlist)
+    meta_list[[i]] <- scholarAI::extract_and_save(
+      link_df$url[i],
+      output_root,
+      greenlist
+    )
   }
   meta_df <- collapse::rowbind(meta_list)
   link_df <- cbind(link_df, meta_df)
@@ -184,5 +191,5 @@ scrape_aei <- function(
 
   scholarAI::copy_pdfs(output_root)
 
-  invisible(tibble::as_tibble(link_df))
+  invisible(link_df)
 }

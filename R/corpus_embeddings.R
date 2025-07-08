@@ -205,8 +205,8 @@ generate_embeddings <- function(texts, model = "text-embedding-3-small", openai 
   )
   
   # Extract embeddings from response
-  # Use py_to_r with convert=TRUE to ensure proper conversion
-  embeddings <- reticulate::py_to_r(response$data, convert = TRUE)
+  # Use py_to_r to convert Python objects to R
+  embeddings <- reticulate::py_to_r(response$data)
   
   # Convert to list of numeric vectors
   embedding_list <- lapply(embeddings, function(item) {
