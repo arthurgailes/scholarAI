@@ -12,6 +12,17 @@ metadata_path <- NULL
 db_path <- NULL
 prompt_path <- NULL
 source("tests/testthat/setup-python.R")
+
+test_that("env is ready", {
+  expect_true(
+    Sys.getenv("OPENAI_API_KEY") != "",
+    "OpenAI API key not available"
+  )
+  expect_true(
+    Sys.getenv("OPENROUTER_API_KEY") != "",
+    "OpenAI API key not available"
+  )
+})
 # Check if we're online and can reach AEI
 tryCatch(
   {
@@ -155,79 +166,68 @@ test_that("Corpus can be converted to DuckDB", {
 message("STEP 5: Generating corpus embeddings")
 
 # Generate corpus embeddings if requirements are met
-embeddings_con <- NULL
-embedding_count <- 0
-similar_docs <- NULL
 
-if (
-  requireNamespace("reticulate", quietly = TRUE) &&
-    openai_available &&
-    Sys.getenv("OPENAI_API_KEY") != "" &&
-    !is.null(db_path)
-) {
-  tryCatch(
-    {
-      # Use the db_path from the previous step
-      scholarAI::corpus_embeddings(db_path)
-      embeddings_con <- DBI::dbConnect(duckdb::duckdb(db_path))
+tryCatch(
+  {
+    # Use the db_path from the previous step
+    load_all()
+    scholarAI::corpus_embeddings(db_path)
+    embeddings_con <- DBI::dbConnect(
+      duckdb::duckdb(),
+      db_path,
+      array = "matrix"
+    )
 
-      # Check if embeddings table was created
-      tables <- DBI::dbListTables(embeddings_con)
+    # Check if embeddings table was created
+    tables <- DBI::dbListTables(embeddings_con)
+    # Check if embeddings table exists
+    expect_true("embeddings" %in% tables)
 
-      if ("embeddings" %in% tables) {
-        # Count embeddings
-        embedding_count <- DBI::dbGetQuery(
-          embeddings_con,
-          "SELECT COUNT(*) as count FROM embeddings"
-        )$count
-        message("Generated ", embedding_count, " embeddings")
+    # Count embeddings
+    embedding_count <- DBI::dbGetQuery(
+      embeddings_con,
+      "SELECT COUNT(*) as count FROM embeddings"
+    )$count
+    message("Generated ", embedding_count, " embeddings")
 
-        # Test similarity search
-        query <- "economic policy"
-        message("Testing similarity search with query: '", query, "'")
-        query_embedding <- scholarAI::get_text_embedding(query)
-        similar_docs <- scholarAI::find_similar_documents(
-          embeddings_con,
-          query_embedding,
-          limit = 3
-        )
+    # Verify we have embeddings
+    # Should have generated at least one embedding
+    expect_gt(embedding_count, 0)
 
-        message("Found ", nrow(similar_docs), " similar documents")
-        if (nrow(similar_docs) > 0) {
-          message(
-            "Top match: ",
-            similar_docs$title[1],
-            " (similarity: ",
-            round(similar_docs$similarity[1], 3),
-            ")"
-          )
-        }
-      }
+    # Test similarity search
+    query <- "economic policy"
+    message("Testing similarity search with query: '", query, "'")
+    query_embedding <- scholarAI::get_text_embedding(query)
+    similar_docs <- scholarAI::find_similar_documents(
+      embeddings_con,
+      query_embedding,
+      limit = 3
+    )
 
-      DBI::dbDisconnect(embeddings_con, shutdown = TRUE)
-    },
-    error = function(e) {
-      message("Error in corpus embeddings generation: ", e$message)
+    # Should find at least one similar document
+    expect_true(nrow(similar_docs) > 0)
+
+    if (nrow(similar_docs) > 0) {
+      message(
+        "Top match: ",
+        similar_docs$title[1],
+        " (similarity: ",
+        round(similar_docs$similarity[1], 3),
+        ")"
+      )
     }
-  )
-} else {
-  message(
-    "Skipping corpus embeddings - required packages not available or API key not set"
-  )
-}
+
+    DBI::dbDisconnect(embeddings_con, shutdown = TRUE)
+  },
+  error = function(e) {
+    message("Error in corpus embeddings generation: ", e$message)
+  }
+)
+
 
 test_that("Corpus embeddings can be generated", {
-  skip_if_not_installed("reticulate")
-  expect_true(
-    Sys.getenv("OPENAI_API_KEY") != "",
-    "OpenAI API key not available"
-  )
-
-  skip_if(is.null(db_path), "DuckDB database not available")
-  skip_if(embedding_count == 0, "No embeddings were generated")
-
   # Test assertions
-  expect_true(embedding_count > 0)
+  expect_true(embedding_count > 0, "No embeddings were generated")
 
   # Test assertions for similarity search
   if (!is.null(similar_docs)) {
