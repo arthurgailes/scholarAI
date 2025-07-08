@@ -5,8 +5,7 @@
 #' Stores everything in a single table for efficient columnar storage.
 #'
 #' @param corpus_dir Directory containing the corpus text files
-#' @param db_path Path where the DuckDB database will be created
-#' @param batch_size Number of documents to process in each batch (default: 100)
+#' @param batch_size Number of documents to process in each batch (default: 50)
 #' @return Invisibly returns the path to the created DuckDB database
 #'         Use `DBI::dbConnect(duckdb::duckdb(), "path/to/database.duckdb")` to connect to the database
 #'
@@ -15,8 +14,7 @@
 #' @export
 corpus_to_duckdb <- function(
   corpus_dir,
-  db_path,
-  batch_size = 100
+  batch_size = 50
 ) {
   # Check if corpus_dir exists
   if (!dir.exists(corpus_dir)) {
@@ -27,13 +25,15 @@ corpus_to_duckdb <- function(
   }
 
   # Check for corpus metadata
-  metadata_path <- file.path(corpus_path, "coprus_metadata.json")
+  metadata_path <- file.path(corpus_dir, "corpus_metadata.json")
   if (!file.exists(metadata_path)) {
     cli::cli_abort(c(
       "x" = "Corpus metadata file not found.",
       "i" = paste("Expected: ", metadata_path, ". Run save_corpus_metadata")
     ))
   }
+
+  db_path <- file.path(corpus_dir, "corpus.duckdb")
 
   # Connect to DuckDB
   cli::cli_alert_info("Creating DuckDB database at {.file {db_path}}")
@@ -51,6 +51,7 @@ corpus_to_duckdb <- function(
   # We'll add text content to this table in batches
   metadata$file_path <- NA_character_
   metadata$content <- NA_character_
+  print(sapply(metadata, class))
 
   DBI::dbWriteTable(con, "corpus", metadata, overwrite = TRUE)
 

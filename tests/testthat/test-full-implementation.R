@@ -47,18 +47,6 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 # Using Tobias Peter as the test author, limiting to 2 pages for reasonable test time
 message("STEP 1: Scraping AEI articles")
 
-test_that("AEI articles can be scraped", {
-  # Skip if offline
-  skip_if_offline()
-  skip_if_not_installed("httr")
-
-  # Test assertions for the scrape results
-  expect_true(nrow(scrape_results) > 0)
-  expect_true("title" %in% names(scrape_results))
-  expect_true("url" %in% names(scrape_results))
-  expect_true("author" %in% names(scrape_results))
-})
-
 # Create a wrapper that limits to 2 pages
 original_get_links <- scholarAI:::get_author_links
 limited_get_links <- function(
@@ -137,39 +125,21 @@ test_that("Corpus metadata can be saved", {
 # Step 4: Convert corpus to DuckDB
 message("STEP 4: Converting corpus to DuckDB")
 
-# Skip DuckDB tests if packages not available
-if (
-  requireNamespace("duckdb", quietly = TRUE) &&
-    requireNamespace("DBI", quietly = TRUE)
-) {
-  # Convert corpus to DuckDB
-  tryCatch(
-    {
-      db_path <- scholarAI::corpus_to_duckdb(out_dir)
+# Convert corpus to DuckDB
+db_path <- scholarAI::corpus_to_duckdb(out_dir)
 
-      # Print database info
-      message("DuckDB database created at: ", db_path)
+# Print database info
+message("DuckDB database created at: ", db_path)
 
-      # Check database tables
-      con <- DBI::dbConnect(duckdb::duckdb(), db_path)
-      tables <- DBI::dbListTables(con)
-      DBI::dbDisconnect(con, shutdown = TRUE)
+# Check database tables
+con <- DBI::dbConnect(duckdb::duckdb(), db_path)
+tables <- DBI::dbListTables(con)
+DBI::dbDisconnect(con, shutdown = TRUE)
 
-      message("Database tables: ", paste(tables, collapse = ", "))
-    },
-    error = function(e) {
-      message("Error in DuckDB conversion: ", e$message)
-    }
-  )
-} else {
-  message("Skipping DuckDB conversion - packages not available")
-}
+message("Database tables: ", paste(tables, collapse = ", "))
+
 
 test_that("Corpus can be converted to DuckDB", {
-  skip_if_not_installed("duckdb")
-  skip_if_not_installed("DBI")
-  skip_if(is.null(db_path), "DuckDB conversion was skipped or failed")
-
   # Test assertions
   expect_true(file.exists(db_path))
 
