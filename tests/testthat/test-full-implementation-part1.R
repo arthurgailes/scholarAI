@@ -1,17 +1,17 @@
-# Real-world implementation of the scholarAI workflow
-# This file runs the entire pipeline with real data (no mocks)
-
-# This script demonstrates the full scholarAI workflow with real data
-# It is not meant to be run in CI/CD pipelines but as a demonstration
-# of the full functionality with real web scraping
+# Real-world implementation of the scholarAI workflow (Part 1)
+# This file runs steps 1-4 of the pipeline with real data (no mocks)
+# 1. Scrape AEI articles
+# 2. Convert corpus to dataframe
+# 3. Save corpus metadata
+# 4. Convert corpus to DuckDB
 
 # Define shared variables that will be used across test blocks
 scrape_results <- NULL
 corpus_df <- NULL
 metadata_path <- NULL
 db_path <- NULL
-prompt_path <- NULL
-source("tests/testthat/setup-python.R")
+# Try to source setup.R, but continue if not found
+try(source("setup.R"), silent = TRUE)
 
 test_that("env is ready", {
   expect_true(
@@ -23,22 +23,25 @@ test_that("env is ready", {
     "OpenAI API key not available"
   )
 })
+
 # Check if we're online and can reach AEI
 tryCatch(
   {
     response <- httr::GET("https://www.aei.org", httr::timeout(5))
     if (httr::http_error(response)) {
-      stop(
-        "Cannot access AEI website. HTTP status: ",
-        httr::status_code(response)
-      )
+      cli::cli_abort(c(
+        "Cannot access AEI website.",
+        "x" = "HTTP status: {httr::status_code(response)}",
+        "i" = "Check your internet connection and try again."
+      ))
     }
   },
   error = function(e) {
-    stop(
-      "This script requires internet access and the AEI website to be available: ",
-      e$message
-    )
+    cli::cli_abort(c(
+      "This script requires internet access and the AEI website to be available.",
+      "x" = "{e$message}",
+      "i" = "Check your internet connection and try again."
+    ))
   }
 )
 
@@ -135,7 +138,6 @@ test_that("Corpus metadata can be saved", {
 # Step 4: Convert corpus to DuckDB
 message("STEP 4: Converting corpus to DuckDB")
 
-
 # Convert corpus to DuckDB
 db_path <- scholarAI::corpus_to_duckdb(corpus_dir = out_dir)
 
@@ -149,7 +151,6 @@ DBI::dbDisconnect(con, shutdown = TRUE)
 
 message("Database tables: ", paste(tables, collapse = ", "))
 
-
 test_that("Corpus can be converted to DuckDB", {
   # Test assertions
   expect_true(file.exists(db_path))
@@ -162,116 +163,8 @@ test_that("Corpus can be converted to DuckDB", {
   expect_true("corpus" %in% tables)
 })
 
-# Step 5: Generate corpus embeddings
-message("STEP 5: Generating corpus embeddings")
-
-# Generate corpus embeddings if requirements are met
-
-tryCatch(
-  {
-    # Use the db_path from the previous step
-    load_all()
-    scholarAI::corpus_embeddings(db_path)
-    embeddings_con <- DBI::dbConnect(
-      duckdb::duckdb(),
-      db_path,
-      array = "matrix"
-    )
-
-    # Check if embeddings table was created
-    tables <- DBI::dbListTables(embeddings_con)
-    # Check if embeddings table exists
-    expect_true("embeddings" %in% tables)
-
-    # Count embeddings
-    embedding_count <- DBI::dbGetQuery(
-      embeddings_con,
-      "SELECT COUNT(*) as count FROM embeddings"
-    )$count
-    message("Generated ", embedding_count, " embeddings")
-
-    # Verify we have embeddings
-    # Should have generated at least one embedding
-    expect_gt(embedding_count, 0)
-
-    # Test similarity search
-    query <- "economic policy"
-    message("Testing similarity search with query: '", query, "'")
-    query_embedding <- scholarAI::get_text_embedding(query)
-    similar_docs <- scholarAI::find_similar_documents(
-      embeddings_con,
-      query_embedding,
-      limit = 3
-    )
-
-    # Should find at least one similar document
-    expect_true(nrow(similar_docs) > 0)
-
-    if (nrow(similar_docs) > 0) {
-      message(
-        "Top match: ",
-        similar_docs$title[1],
-        " (similarity: ",
-        round(similar_docs$similarity[1], 3),
-        ")"
-      )
-    }
-
-    DBI::dbDisconnect(embeddings_con, shutdown = TRUE)
-  },
-  error = function(e) {
-    message("Error in corpus embeddings generation: ", e$message)
-  }
-)
-
-
-test_that("Corpus embeddings can be generated", {
-  # Test assertions
-  expect_true(embedding_count > 0, "No embeddings were generated")
-
-  # Test assertions for similarity search
-  if (!is.null(similar_docs)) {
-    expect_true(is.data.frame(similar_docs))
-    expect_true("similarity" %in% names(similar_docs))
-  }
-})
-
-# Step 6: Build scholar prompt
-message("STEP 6: Building scholar prompt")
-
-# Build scholar prompt
-tryCatch(
-  {
-    prompt_path <- scholarAI::build_scholar_prompt(
-      corpus_path = out_dir,
-      model = "openai/gpt-4o",
-      output_path = file.path(out_dir, "scholar_instructions.md")
-    )
-
-    # Print prompt file info
-    message("Scholar instructions created at: ", prompt_path)
-  },
-  error = function(e) {
-    message("Error in scholar prompt generation: ", e$message)
-  }
-)
-
-test_that("Scholar prompt can be built", {
-  skip_if(
-    is.null(prompt_path),
-    "Scholar prompt generation was skipped or failed"
-  )
-
-  # Test assertions
-  expect_true(file.exists(prompt_path))
-  expect_true(file.size(prompt_path) > 0)
-})
-
-# Print final directory structure summary
-file_count <- length(list.files(out_dir, recursive = TRUE))
-message("Final directory structure contains ", file_count, " files")
-
-# Print summary of the implementation
-message("Real-world implementation completed successfully")
+# Print summary of part 1
+message("Real-world implementation part 1 completed successfully")
 message("Output directory: ", out_dir)
+message("Database path: ", db_path)
 message("Number of articles scraped: ", nrow(scrape_results))

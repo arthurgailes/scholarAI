@@ -152,20 +152,31 @@ corpus_to_duckdb <- function(
     for (j in seq_len(nrow(batch_data))) {
       if ("folder" %in% names(batch_data)) {
         folder <- batch_data$folder[j]
+        # Try both text.txt (original) and article_text.txt (used in scraped content)
         text_file <- file.path(folder, "text.txt")
-
+        article_text_file <- file.path(folder, "article_text.txt")
+        
+        # Check which file exists and use that one
         if (file.exists(text_file)) {
-          # Read text content
+          # Read text content from text.txt
           text_content <- readLines(text_file, warn = FALSE)
           text_content <- paste(text_content, collapse = "\n")
-
+          
           # Update batch data
           batch_data$file_path[j] <- text_file
+          batch_data$content[j] <- text_content
+        } else if (file.exists(article_text_file)) {
+          # Read text content from article_text.txt
+          text_content <- readLines(article_text_file, warn = FALSE)
+          text_content <- paste(text_content, collapse = "\n")
+          
+          # Update batch data
+          batch_data$file_path[j] <- article_text_file
           batch_data$content[j] <- text_content
         } else {
           cli::cli_warn(c(
             "!" = "Text file not found for document {offset + j}.",
-            "i" = paste0("Expected: ", text_file)
+            "i" = paste0("Expected either: ", text_file, " or ", article_text_file)
           ))
         }
       } else {
