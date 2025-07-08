@@ -11,6 +11,7 @@ corpus_df <- NULL
 metadata_path <- NULL
 db_path <- NULL
 prompt_path <- NULL
+source("tests/testthat/setup-python.R")
 # Check if we're online and can reach AEI
 tryCatch(
   {
@@ -38,9 +39,7 @@ out_dir <- file.path(
 )
 
 # Clear the directory at the start
-if (dir.exists(out_dir)) {
-  unlink(out_dir, recursive = TRUE)
-}
+if (dir.exists(out_dir)) unlink(out_dir, recursive = TRUE)
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 # Step 1: Scrape AEI articles for a specific author
@@ -125,8 +124,9 @@ test_that("Corpus metadata can be saved", {
 # Step 4: Convert corpus to DuckDB
 message("STEP 4: Converting corpus to DuckDB")
 
+
 # Convert corpus to DuckDB
-db_path <- scholarAI::corpus_to_duckdb(out_dir)
+db_path <- scholarAI::corpus_to_duckdb(corpus_dir = out_dir)
 
 # Print database info
 message("DuckDB database created at: ", db_path)
@@ -168,7 +168,8 @@ if (
   tryCatch(
     {
       # Use the db_path from the previous step
-      embeddings_con <- scholarAI::corpus_embeddings(db_path)
+      scholarAI::corpus_embeddings(db_path)
+      embeddings_con <- DBI::dbConnect(duckdb::duckdb(db_path))
 
       # Check if embeddings table was created
       tables <- DBI::dbListTables(embeddings_con)
@@ -217,11 +218,11 @@ if (
 
 test_that("Corpus embeddings can be generated", {
   skip_if_not_installed("reticulate")
-  skip_if(Sys.getenv("OPENAI_API_KEY") == "", "OpenAI API key not available")
-  skip_if(
-    !openai_available,
-    "Python openai module not available or mamba env not found"
+  expect_true(
+    Sys.getenv("OPENAI_API_KEY") != "",
+    "OpenAI API key not available"
   )
+
   skip_if(is.null(db_path), "DuckDB database not available")
   skip_if(embedding_count == 0, "No embeddings were generated")
 
@@ -243,6 +244,7 @@ tryCatch(
   {
     prompt_path <- scholarAI::build_scholar_prompt(
       corpus_path = out_dir,
+      model = "openai/gpt-4o",
       output_path = file.path(out_dir, "scholar_instructions.md")
     )
 

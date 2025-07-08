@@ -62,7 +62,7 @@ corpus_embeddings <- function(
   # Connect to DuckDB
   cli::cli_alert_info("Connecting to DuckDB database at {.file {db_path}}")
   con <- DBI::dbConnect(duckdb::duckdb(), db_path)
-  on.exit(DBI::dbDisconnect(con, shutdown = FALSE), add = TRUE)
+  # Remove the automatic disconnect since we'll handle it explicitly at the end
 
   # Check if corpus table exists
   tables <- DBI::dbListTables(con)
@@ -94,29 +94,63 @@ corpus_embeddings <- function(
   # Add Vector Similarity Search extension if requested
   if (add_vss) {
     cli::cli_alert_info("Adding Vector Similarity Search extension to DuckDB")
-    tryCatch(
-      {
-        DBI::dbExecute(con, "INSTALL VSS")
-        DBI::dbExecute(con, "LOAD VSS")
-      },
-      error = function(e) {
-        cli::cli_warn(c(
-          "!" = "Failed to install or load VSS extension.",
-          "i" = "You may need to manually install it or use a newer version of DuckDB."
-        ))
-      }
+    vss_available <- FALSE
+    
+    # First check if VSS is already installed
+    extensions_query <- tryCatch(
+      DBI::dbGetQuery(con, "SELECT name FROM duckdb_extensions() WHERE name = 'vss'"),
+      error = function(e) data.frame(name = character(0))
     )
+    
+    if (nrow(extensions_query) > 0) {
+      # VSS extension exists, try to load it
+      tryCatch(
+        {
+          DBI::dbExecute(con, "LOAD vss")
+          vss_available <- TRUE
+          cli::cli_alert_success("Successfully loaded Vector Similarity Search extension")
+        },
+        error = function(e) {
+          cli::cli_warn(c(
+            "!" = "Failed to load Vector Similarity Search extension.",
+            "i" = "Error: {as.character(e)}"
+          ))
+        }
+      )
+    } else {
+      # Try to install VSS extension
+      tryCatch(
+        {
+          DBI::dbExecute(con, "INSTALL vss")
+          DBI::dbExecute(con, "LOAD vss")
+          vss_available <- TRUE
+          cli::cli_alert_success("Successfully installed and loaded Vector Similarity Search extension")
+        },
+        error = function(e) {
+          cli::cli_warn(c(
+            "!" = "Failed to install Vector Similarity Search extension.",
+            "i" = "You may need to manually install it or use a newer version of DuckDB.",
+            "i" = "Error: {as.character(e)}"
+          ))
+        }
+      )
+    }
+    
+    # Store VSS availability for later use
+    attr(con, "vss_available") <- vss_available
   }
 
   # Check if embeddings table exists, create if not
   if (!"embeddings" %in% tables) {
     cli::cli_alert_info("Creating embeddings table")
+    
+    # For HNSW index, we need to specify the exact dimensions of the FLOAT array
     DBI::dbExecute(
       con,
       paste0(
         "CREATE TABLE embeddings (",
         "id INTEGER, ",
-        "embedding FLOAT[]",
+        "embedding FLOAT[", dimensions, "]",
         ")"
       )
     )
@@ -159,48 +193,101 @@ corpus_embeddings <- function(
       # Generate embeddings for batch
       embeddings <- generate_embeddings(batch_data$content, model, openai)
 
-      # Prepare data for insertion
+      # Prepare data for insertion - ensure embeddings are properly formatted for DuckDB
+      # We need to convert each embedding vector to a string representation that DuckDB will interpret as FLOAT[N]
+      embedding_strings <- sapply(embeddings, function(emb) {
+        paste0("[", paste(emb, collapse = ","), "]")
+      })
+      
+      # Create data frame for insertion
       embedding_data <- data.frame(
         id = batch_data$rowid,
-        embedding = I(embeddings)
+        embedding = embedding_strings
       )
-
-      # Insert embeddings into database
-      DBI::dbWriteTable(con, "embeddings", embedding_data, append = TRUE)
+      
+      # Insert embeddings into database using SQL to ensure proper typing
+      for (i in seq_len(nrow(embedding_data))) {
+        sql <- paste0(
+          "INSERT INTO embeddings VALUES (", 
+          embedding_data$id[i], ", ", 
+          embedding_data$embedding[i], 
+          ")"
+        )
+        DBI::dbExecute(con, sql)
+      }
     }
 
     # Update progress bar
     cli::cli_progress_update(set = i)
   }
 
-  # Create index for faster similarity search if VSS is available
-  tryCatch(
-    {
-      cli::cli_alert_info("Creating vector similarity search index")
-      DBI::dbExecute(
-        con,
-        paste0(
-          "CREATE INDEX IF NOT EXISTS embedding_idx ",
-          "ON embeddings USING VSS (embedding) ",
-          "WITH (dimensions=",
-          dimensions,
-          ")"
-        )
-      )
-    },
-    error = function(e) {
-      cli::cli_warn(c(
-        "!" = "Failed to create VSS index.",
-        "i" = "Vector similarity searches may be slower."
-      ))
-    }
-  )
-
   cli::cli_alert_success(
     "Successfully generated embeddings for corpus in {.file {db_path}}"
   )
+  
+  # Create index for faster similarity search if VSS is available
+  # This is done as the last step to avoid potential database corruption
+  vss_available <- isTRUE(attr(con, "vss_available"))
+  
+  if (vss_available) {
+    cli::cli_alert_info("Creating vector similarity search index")
+    tryCatch(
+      {
+        # First check if the index already exists
+        index_query <- tryCatch(
+          DBI::dbGetQuery(con, "SELECT * FROM duckdb_indexes() WHERE table_name = 'embeddings' AND index_name = 'embedding_idx'"),
+          error = function(e) data.frame()
+        )
+        
+        if (nrow(index_query) == 0) {
+          # Enable HNSW persistence for non-memory databases
+          DBI::dbExecute(con, "SET hnsw_enable_experimental_persistence = true")
+          DBI::dbExecute(
+            con,
+            paste0(
+              "CREATE INDEX IF NOT EXISTS embedding_idx ",
+              "ON embeddings USING HNSW (embedding) ",
+              "WITH (metric = 'cosine')"
+            )
+          )
+          cli::cli_alert_success("Successfully created HNSW index for vector similarity search")
+        } else {
+          cli::cli_alert_info("Vector similarity search index already exists")
+        }
+      },
+      error = function(e) {
+        # Check if this is a persistence-related error
+        is_persistence_error <- grepl("in-memory|persistence", tolower(as.character(e)), ignore.case = TRUE)
+        
+        if (is_persistence_error) {
+          cli::cli_warn(c(
+            "!" = "Failed to create vector similarity search index due to persistence settings.",
+            "i" = "Vector similarity searches may be slower.",
+            "i" = "Error: {as.character(e)}",
+            "i" = "The HNSW index requires either an in-memory database or the 'hnsw_enable_experimental_persistence' option."
+          ))
+        } else {
+          cli::cli_warn(c(
+            "!" = "Failed to create vector similarity search index.",
+            "i" = "Vector similarity searches may be slower.",
+            "i" = "Error: {as.character(e)}"
+          ))
+        }
+      }
+    )
+  } else {
+    cli::cli_warn(c(
+      "!" = "VSS extension not available. Skipping index creation.",
+      "i" = "Vector similarity searches will use the fallback method."
+    ))
+  }
 
-  invisible(con)
+  # Close the connection properly before returning
+  cli::cli_alert_info("Closing database connection")
+  DBI::dbDisconnect(con, shutdown = TRUE)
+  
+  # Return the path to the database invisibly
+  invisible(db_path)
 }
 
 
@@ -294,27 +381,32 @@ find_similar_documents <- function(
     "]"
   )
 
-  # Try using VSS for fast similarity search
+  # Try using VSS with HNSW index for fast similarity search
   tryCatch(
     {
+      # According to VSS docs, we should use array_cosine_distance for cosine metric
+      # The HNSW index will automatically be used when we ORDER BY the distance function
       query <- paste0(
         "SELECT e.id, c.title, c.url, ",
-        "cosine_similarity(e.embedding, ",
+        "1 - array_cosine_distance(e.embedding, ",
         embedding_str,
         ") AS similarity ",
         "FROM embeddings e ",
         "JOIN corpus c ON e.id = c.rowid ",
-        "WHERE cosine_similarity(e.embedding, ",
+        "ORDER BY array_cosine_distance(e.embedding, ",
         embedding_str,
-        ") >= ",
-        min_similarity,
-        " ",
-        "ORDER BY similarity DESC ",
+        ") ASC ",
         "LIMIT ",
         limit
       )
 
+      # Execute the query
       results <- DBI::dbGetQuery(con, query)
+      
+      # Filter by minimum similarity if needed
+      if (min_similarity > 0) {
+        results <- results[results$similarity >= min_similarity, ]
+      }
 
       if (nrow(results) == 0) {
         cli::cli_alert_info(
@@ -325,10 +417,21 @@ find_similar_documents <- function(
       return(results)
     },
     error = function(e) {
-      cli::cli_warn(c(
-        "!" = "VSS similarity search failed. Falling back to slower method.",
-        "i" = "Error: {as.character(e)}"
-      ))
+      # Check if this is a VSS/HNSW-specific error or a general SQL error
+      is_index_error <- grepl("vss|hnsw|vector|similarity|index", tolower(as.character(e)), ignore.case = TRUE)
+      
+      if (is_index_error) {
+        cli::cli_warn(c(
+          "!" = "Vector similarity search with HNSW index failed. Falling back to slower method.",
+          "i" = "Error: {as.character(e)}",
+          "i" = 'Try running DBI::dbExecute(con, "INSTALL vss") and DBI::dbExecute(con, "LOAD vss") first'
+        ))
+      } else {
+        cli::cli_warn(c(
+          "!" = "SQL query error during similarity search. Falling back to slower method.",
+          "i" = "Error: {as.character(e)}"
+        ))
+      }
 
       # Fallback to manual calculation if VSS fails
       query <- paste0(

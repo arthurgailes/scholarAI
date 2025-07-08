@@ -28,3 +28,4 @@
 - This is not going to CRAN
 - Do not repeat yourself
 - Keep an eye out for duplication or overly verbose code. This makes it harder for me to navigate.
+- Fail early and quickly. Go light on error handling and trycatch; a little goes a long way. Do not use these in ways that will mask problems. 
