@@ -23,13 +23,9 @@ get_openai_embeddings <- function(
 ) {
   check_embedding_input(texts, openai_key, max_attempts, pause_sec)
 
-  cli::cli_progress_bar("Getting embeddings", total = length(texts))
   results <- lapply(texts, function(txt) {
-    out <- get_single_embedding(txt)
-    cli::cli_progress_update()
-    out
+    get_single_embedding(txt, model, openai_key, max_attempts, pause_sec)
   })
-  cli::cli_progress_done()
 
   emb_dim <- max(vapply(
     results,
@@ -49,7 +45,13 @@ get_openai_embeddings <- function(
 }
 
 #' function for single embedding
-get_single_embedding <- function(txt, model, max_attempts, pause_sec) {
+get_single_embedding <- function(
+  txt,
+  model,
+  openai_key,
+  max_attempts,
+  pause_sec
+) {
   attempt <- 1
   repeat {
     resp <- tryCatch(
