@@ -163,6 +163,31 @@ test_that("Corpus can be converted to DuckDB", {
   expect_true("corpus" %in% tables)
 })
 
+test_that("DuckDB corpus contains valid content", {
+  # This test depends on the successful creation of the database in the previous test
+  skip_if_not(file.exists(db_path), "Database file not found, skipping content check.")
+
+  # Connect to the database
+  con <- DBI::dbConnect(duckdb::duckdb(), db_path)
+  on.exit(DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
+
+  # Check that a good portion of the content is not NULL and has length
+  content_check <- DBI::dbGetQuery(con, "
+    SELECT 
+      CAST(SUM(CASE WHEN content IS NOT NULL AND LENGTH(content) > 100 THEN 1 ELSE 0 END) AS DOUBLE) / COUNT(*) as ratio_with_content,
+      AVG(LENGTH(content)) as avg_content_length
+    FROM corpus
+  ")
+  
+  # Expect at least 80% of documents to have substantial content
+  expect_gt(content_check$ratio_with_content, 0.8, 
+            label = "Ratio of documents with content > 100 chars")
+  
+  # Expect average content length to be substantial (e.g., > 500 chars)
+  expect_gt(content_check$avg_content_length, 500, 
+            label = "Average content length")
+})
+
 # Print summary of part 1
 message("Real-world implementation part 1 completed successfully")
 message("Output directory: ", out_dir)

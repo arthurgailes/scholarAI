@@ -151,10 +151,25 @@ corpus_to_duckdb <- function(
     # Process each document in the batch
     for (j in seq_len(nrow(batch_data))) {
       if ("folder" %in% names(batch_data)) {
-        folder <- batch_data$folder[j]
-        # Try both text.txt (original) and article_text.txt (used in scraped content)
-        text_file <- file.path(folder, "text.txt")
-        article_text_file <- file.path(folder, "article_text.txt")
+        # The 'folder' path from metadata is relative to the project root.
+        # When tests are run, the working dir is `tests/testthat`, so we need to adjust.
+        # We'll construct the path from the parent of the `corpus_dir`.
+        folder_path_from_metadata <- batch_data$folder[j]
+        
+        # The folder path is like './test_data/real_world_implementation/articles/...' 
+        # and corpus_dir is 'tests/testthat/test_data/real_world_implementation'.
+        # We need to resolve from the project root. A simple way during tests is to go up.
+        # A more robust solution would use here::here() or rprojroot, but we avoid dependencies.
+        # This approach assumes a standard testthat execution context.
+        
+        # Correctly resolve the path by starting from the parent of the corpus_dir's parent.
+        # This should resolve to the project root during testing.
+        project_root_during_test <- dirname(dirname(corpus_dir))
+        full_folder_path <- file.path(project_root_during_test, folder_path_from_metadata)
+
+        # Now, check for the text files in the correctly resolved path
+        text_file <- file.path(full_folder_path, "text.txt")
+        article_text_file <- file.path(full_folder_path, "article_text.txt")
         
         # Check which file exists and use that one
         if (file.exists(text_file)) {

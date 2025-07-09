@@ -6,7 +6,7 @@
 # This file depends on the output from test-full-implementation-part1.R
 
 # Try to source setup.R, but continue if not found
-try(source("setup.R"), silent = TRUE)
+# try(source("setup.R"), silent = TRUE)
 
 # Define paths based on the same convention as part 1
 out_dir <- file.path(
@@ -17,7 +17,7 @@ out_dir <- file.path(
 
 # Infer the database path - should be in the corpus directory
 db_path <- file.path(out_dir, "corpus.duckdb")
-metadata_path <- file.path(out_dir, "metadata.csv")
+metadata_path <- file.path(out_dir, "corpus_metadata.json")
 
 # Skip all tests if the database doesn't exist
 if (!file.exists(db_path)) {
@@ -133,7 +133,7 @@ test_that("Scholar prompt can be built", {
   # Build the scholar prompt
   prompt_path <- scholarAI::build_scholar_prompt(
     corpus_path = out_dir,
-    model = "gemini/2.5",
+    model = "google/gemini-2.0-flash-001",
     output_path = file.path(out_dir, "scholar_instructions.md")
   )
 

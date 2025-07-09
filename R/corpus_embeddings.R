@@ -179,16 +179,17 @@ corpus_embeddings <- function(
   
   # Process each batch
   for (i in seq_len(batches)) {
-    start_idx <- (i - 1) * batch_size + 1
-    end_idx <- min(i * batch_size, total_docs)
+    # Calculate batch range for logging
+    batch_start <- (i - 1) * batch_size + 1
+    batch_end <- min(i * batch_size, total_docs)
     
-    cli::cli_alert_info("Processing batch {i}/{batches} (documents {start_idx}-{end_idx})")
+    cli::cli_alert_info("Processing batch {i}/{batches} (documents {batch_start}-{batch_end})")
     
     # Get batch data - don't filter out NULL content yet
-    # Note: DuckDB uses 0-based indexing for rowids, so adjust accordingly
+    # Note: DuckDB rowids are 1-based in our implementation
     query <- paste0(
-      "SELECT rowid, content FROM corpus ",
-      "WHERE rowid >= ", start_idx - 1, " AND rowid < ", end_idx
+      "SELECT rowid, title, content FROM corpus ",
+      "LIMIT ", batch_size, " OFFSET ", (i - 1) * batch_size
     )
     batch_data <- DBI::dbGetQuery(con, query)
     
@@ -402,12 +403,30 @@ corpus_embeddings <- function(
 #' @param openai Optional pre-initialized OpenAI client
 #' @return List of numeric vectors (embeddings)
 #' @keywords internal
-generate_embeddings <- function(texts, model = "text-embedding-3-small", openai = NULL) {
-  # Debug: Print input texts
-  cli::cli_alert_info("Generating embeddings for {length(texts)} texts")
-  for (i in seq_along(texts)) {
-    cli::cli_alert_info("Text {i}: {substr(texts[i], 1, 50)}...")
+
+
+# Function to split text into chunks
+chunk_text <- function(text, max_tokens = 8000, overlap_tokens = 200) {
+  # A more conservative character count as a proxy for tokens (1 token ~ 3 chars)
+  max_chars <- max_tokens * 3
+  overlap_chars <- overlap_tokens * 3
+  
+  if (nchar(text) <= max_chars) {
+    return(list(text))
   }
+  
+  chunks <- list()
+  start <- 1
+  while (start <= nchar(text)) {
+    end <- min(start + max_chars - 1, nchar(text))
+    chunks <- append(chunks, substr(text, start, end))
+    start <- start + max_chars - overlap_chars
+    if (start > nchar(text)) break
+  }
+  return(chunks)
+}
+
+generate_embeddings <- function(texts, model = "text-embedding-3-small", openai = NULL) {
   
   # Initialize OpenAI client if not provided
   if (is.null(openai)) {
@@ -421,32 +440,74 @@ generate_embeddings <- function(texts, model = "text-embedding-3-small", openai 
     openai$api_key <- api_key
   }
   
-  # Generate embeddings
-  cli::cli_alert_info("Calling OpenAI API for embeddings")
-  tryCatch({
-    response <- openai$embeddings$create(
-      input = texts,
-      model = model
-    )
-    
-    # Extract embeddings from response
-    cli::cli_alert_success("Received response from OpenAI API")
-    
-    # Convert Python objects to R
-    data <- reticulate::py_to_r(response$data)
-    cli::cli_alert_info("Response contains {length(data)} embeddings")
-    
-    # Extract embeddings from the data
-    embeddings <- lapply(data, function(item) {
-      item$embedding
-    })
-    
-    return(embeddings)
-  }, error = function(e) {
-    cli::cli_alert_danger("Error generating embeddings: {e$message}")
-    # Return empty list if error occurs
-    return(list())
-  })
+  client <- openai$OpenAI(api_key = openai$api_key)
+  
+  # This will hold the final embedding for each document (text)
+  final_embeddings <- list()
+  
+  for (text in texts) {
+    if (is.na(text) || text == "") {
+        final_embeddings <- append(final_embeddings, list(NULL))
+        next
+    }
+
+    # Estimate tokens and chunk if necessary
+    if (n_token(text) > 8190) { # text-embedding-3-small max is 8191
+      text_chunks <- chunk_text(text, max_tokens = 8000)
+      
+      chunk_embeddings <- list()
+      for (chunk in text_chunks) {
+        # Use a safer method to pass the chunk to python to avoid escaping issues
+        reticulate::py_run_string("import openai")
+        py_main <- reticulate::import_main()
+        py_main$chunk <- chunk
+        py_main$model <- model
+        py_main$api_key <- openai$api_key
+        
+        py_code <- "client = openai.OpenAI(api_key=api_key)\nresponse = client.embeddings.create(input=[chunk], model=model)\nprint(response.data[0].embedding)"
+        
+        result <- reticulate::py_capture_output(reticulate::py_run_string(py_code, local=TRUE))
+        
+        if (is.null(result$stderr) || result$stderr == "") {
+          # Output is a string like '[0.1, 0.2, ...]', need to parse it
+          embedding_vector <- as.numeric(strsplit(gsub("\\[|\\]", "", result$stdout), ",")[[1]])
+          chunk_embeddings <- append(chunk_embeddings, list(embedding_vector))
+        } else {
+          cli::cli_warn("Error embedding a chunk: {result$stderr}")
+        }
+      }
+      
+      if (length(chunk_embeddings) > 0) {
+        # Average the embeddings of the chunks
+        avg_embedding <- colMeans(do.call(rbind, chunk_embeddings))
+        final_embeddings <- append(final_embeddings, list(avg_embedding))
+      } else {
+        final_embeddings <- append(final_embeddings, list(NULL)) # Failed to embed any chunk
+      }
+      
+    } else {
+      # Document is small enough, embed directly
+      reticulate::py_run_string("import openai")
+      py_main <- reticulate::import_main()
+      py_main$text <- text
+      py_main$model <- model
+      py_main$api_key <- openai$api_key
+
+      py_code <- "client = openai.OpenAI(api_key=api_key)\nresponse = client.embeddings.create(input=[text], model=model)\nprint(response.data[0].embedding)"
+
+      result <- reticulate::py_capture_output(reticulate::py_run_string(py_code, local=TRUE))
+      
+      if (is.null(result$stderr) || result$stderr == "") {
+        embedding_vector <- as.numeric(strsplit(gsub("\\[|\\]", "", result$stdout), ",")[[1]])
+        final_embeddings <- append(final_embeddings, list(embedding_vector))
+      } else {
+        cli::cli_warn("Error embedding a document: {result$stderr}")
+        final_embeddings <- append(final_embeddings, list(NULL))
+      }
+    }
+  }
+  
+  return(final_embeddings)
 }
 
 #' Get embedding for a single text
