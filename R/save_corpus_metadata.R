@@ -1,3 +1,27 @@
+#' Save the corpus metadata as a JSON file in the output root
+#'
+#' Reads all metadata.json files under the given root directory, combines into a dataframe,
+#' and writes the result as corpus_metadata.json in the root using yyjsonr::write_json_file.
+#'
+#' @param root_dir The root directory containing article subfolders with metadata.json files.
+#' @param file_name The name of the output file. Default is "corpus_metadata.json".
+#'
+#' @return Invisibly returns the metadata as a data.frame
+#'
+#' @examples
+#' # save_corpus_metadata("my_results")
+#' @export
+save_corpus_metadata <- function(
+  root_dir,
+  file_name = "corpus_metadata.json"
+) {
+  df <- text_corpus_to_df(root_dir)
+  out_path <- file.path(root_dir, file_name)
+  yyjsonr::write_json_file(df, out_path, pretty = TRUE, auto_unbox = TRUE)
+  invisible(df)
+}
+
+
 #' Convert a directory of AEI article folders into a dataframe via metadata.json
 #'
 #' Recursively searches for all metadata.json files under the given root directory and
@@ -24,18 +48,14 @@ text_corpus_to_df <- function(
   )
 
   if (length(meta_files) == 0) {
-    cli::cli_warn(c(
-      "! No metadata.json files found in directory.",
-      "i" = paste0("Checked: ", root_dir)
-    ))
-    return(data.frame())
+    stop("! No metadata.json files found in ", root_dir)
   }
 
   # Helper to safely read one metadata.json
   read_meta <- function(path) {
     tryCatch(
       {
-        meta <- jsonlite::read_json(path, simplifyVector = TRUE)
+        meta <- yyjsonr::read_json_file(path)
         # Always add a column for the folder path
         meta$folder <- dirname(path)
         meta
@@ -79,27 +99,4 @@ text_corpus_to_df <- function(
 
   rownames(df) <- NULL
   df
-}
-
-#' Save the corpus metadata as a JSON file in the output root
-#'
-#' Reads all metadata.json files under the given root directory, combines into a dataframe,
-#' and writes the result as corpus_metadata.json in the root using yyjsonr::write_json_file.
-#'
-#' @param root_dir The root directory containing article subfolders with metadata.json files.
-#' @param file_name The name of the output file. Default is "corpus_metadata.json".
-#'
-#' @return Invisibly returns the path to the written file.
-#'
-#' @examples
-#' # save_corpus_metadata("my_results")
-#' @export
-save_corpus_metadata <- function(
-  root_dir,
-  file_name = "corpus_metadata.json"
-) {
-  df <- text_corpus_to_df(root_dir)
-  out_path <- file.path(root_dir, file_name)
-  yyjsonr::write_json_file(df, out_path, pretty = TRUE, auto_unbox = TRUE)
-  invisible(out_path)
 }
