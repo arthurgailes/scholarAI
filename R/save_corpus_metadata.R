@@ -5,6 +5,7 @@
 #'
 #' @param root_dir The root directory containing article subfolders with metadata.json files.
 #' @param file_name The name of the output file. Default is "corpus_metadata.json".
+#' @param id_col The column to use as the id. Default is "seq" for sequential ids.
 #'
 #' @return Invisibly returns the metadata as a data.frame
 #'
@@ -13,9 +14,24 @@
 #' @export
 save_corpus_metadata <- function(
   root_dir,
-  file_name = "corpus_metadata.json"
+  file_name = "corpus_metadata.json",
+  id_col = "seq"
 ) {
   df <- text_corpus_to_df(root_dir)
+
+  # Add id column
+  if (identical(id_col, "seq")) {
+    df$id <- seq_len(nrow(df))
+  } else if (id_col %in% names(df)) {
+    df$id <- df[[id_col]]
+  } else {
+    stop("id_col must be 'seq' or a valid column name")
+  }
+
+  if (anyDuplicated(df$id) != 0) {
+    stop("corpus id column is not unique")
+  }
+
   out_path <- file.path(root_dir, file_name)
   yyjsonr::write_json_file(df, out_path, pretty = TRUE, auto_unbox = TRUE)
   invisible(df)
