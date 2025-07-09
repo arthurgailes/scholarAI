@@ -23,6 +23,10 @@ get_openai_embeddings <- function(
 ) {
   check_embedding_input(texts, openai_key, max_attempts, pause_sec)
 
+  if (length(texts) == 0) {
+    return(matrix(numeric(0), nrow = 0, ncol = 0))
+  }
+
   results <- lapply(texts, function(txt) {
     get_single_embedding(txt, model, openai_key, max_attempts, pause_sec)
   })
@@ -39,18 +43,17 @@ get_openai_embeddings <- function(
     numeric(emb_dim)
   ))
   rownames(mat) <- NULL
-  if (any(vapply(results, function(x) all(is.na(x)), logical(1))))
-    warning("Some embeddings failed and are returned as NA rows.")
+  
   mat
 }
 
 #' function for single embedding
 get_single_embedding <- function(
   txt,
-  model,
-  openai_key,
-  max_attempts,
-  pause_sec
+  model = "text-embedding-3-small",
+  openai_key = Sys.getenv("OPENAI_API_KEY"),
+  max_attempts = 3,
+  pause_sec = 0.1
 ) {
   attempt <- 1
   repeat {
@@ -67,12 +70,12 @@ get_single_embedding <- function(
       error = function(e) e
     )
     if (inherits(resp, "response") && httr::status_code(resp) == 200) {
-      return(httr::content(resp)$data[[1]]$embedding)
+      return(as.numeric(httr::content(resp)$data[[1]]$embedding))
     }
     if (attempt >= max_attempts) {
       warning(sprintf(
-        "Failed to get embedding after %d attempts; returning NA.",
-        max_attempts
+        "Failed to get embedding for '%s' after %d attempts; returning NA.",
+        txt, max_attempts
       ))
       return(NA)
     }
@@ -83,7 +86,6 @@ get_single_embedding <- function(
 
 check_embedding_input <- function(texts, openai_key, max_attempts, pause_sec) {
   if (!is.character(texts)) stop("texts must be a character vector")
-  if (length(texts) == 0) return(matrix(numeric(0), nrow = 0))
   if (!nzchar(openai_key)) stop("No OpenAI API key provided.")
   if (!is.numeric(max_attempts) || max_attempts < 1)
     stop("max_attempts must be >= 1")

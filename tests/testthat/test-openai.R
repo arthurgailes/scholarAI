@@ -7,6 +7,14 @@ skip_if_not(
   "No OpenAI API key found, skipping API tests"
 )
 
+test_that("get_single_embedding returns a numeric vector of correct length", {
+  emb <- scholarAI::get_single_embedding("hello world")
+  expect_true(is.numeric(emb))
+  expect_true(is.vector(emb))
+  expect_true(length(emb) == 1536)
+  expect_false(all(is.na(emb)))
+})
+
 test_that("get_openai_embeddings returns a properly structured matrix", {
   texts <- c("hello world", "this is a test")
   embeddings <- scholarAI::get_openai_embeddings(texts)
@@ -15,19 +23,19 @@ test_that("get_openai_embeddings returns a properly structured matrix", {
   expect_true(is.matrix(embeddings))
   expect_true(is.numeric(embeddings))
   expect_equal(nrow(embeddings), length(texts))
-  
+
   # The API might fail during testing, but we should still get a matrix
   # If it works, we'll get 1536 columns; if it fails, we'll get 1 column of NAs
   expect_true(ncol(embeddings) == 1536 || ncol(embeddings) == 1)
-  
+
   # Additional tests if the API call succeeded
   if (ncol(embeddings) == 1536) {
     # Each row should be a unit vector (approximately)
     row_norms <- sqrt(rowSums(embeddings^2))
     expect_true(all(abs(row_norms - 1) < 0.01))
-    
+
     # Different texts should have different embeddings
-    expect_false(identical(embeddings[1,], embeddings[2,]))
+    expect_false(identical(embeddings[1, ], embeddings[2, ]))
   }
 })
 
