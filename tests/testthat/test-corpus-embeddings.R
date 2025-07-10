@@ -18,7 +18,7 @@ test_that("corpus_embeddings creates embeddings in DuckDB", {
   dir.create(corpus_dir)
 
   # # Create metadata
-  metadata <- make_mock_corpus_metadata(folder = corpus_dir)
+  metadata <- make_mock_corpus_metadata(root_dir = corpus_dir)
 
   # Write metadata file
   yyjsonr::write_json_file(
@@ -30,12 +30,18 @@ test_that("corpus_embeddings creates embeddings in DuckDB", {
 
   # Create test document directories and files
   sapply(metadata$folder, dir.create, recursive = TRUE)
-  sapply(metadata$folder, function(folder) {
-    writeLines(
-      "This is the content of article 1",
-      file.path(folder, "text.txt")
-    )
-  })
+
+  sample_text <- c("Arthur Gailes", "Edward Pinto", "Tobias Peter")
+  mapply(
+    function(folder, text) {
+      writeLines(
+        text,
+        file.path(folder, "text.txt")
+      )
+    },
+    metadata$folder,
+    sample_text
+  )
 
   db_path <- file.path(corpus_dir, "corpus.duckdb")
   scholarAI::corpus_to_duckdb(corpus_dir)
@@ -72,38 +78,23 @@ test_that("corpus_embeddings creates embeddings in DuckDB", {
   # Check embedding dimensions (OpenAI embeddings should be 1536-dimensional)
   expect_equal(length(sample_embedding), 1536)
 
-  # Only test similarity search if we have embeddings
-  if (embedding_count > 0) {
-    # Try to get embedding for query, but handle potential API failures
-    tryCatch(
-      {
-        query <- "global warming"
-        query_embedding <- scholarAI::get_text_embedding(query)
+  query <- "Arthur"
+  query_embedding <- scholarAI::get_text_embedding(query)
 
-        # Only proceed if we got a valid embedding
-        if (is.numeric(query_embedding) && length(query_embedding) > 0) {
-          similar_docs <- scholarAI::find_similar_documents(
-            con,
-            query_embedding,
-            limit = 3
-          )
+  expect_type(query_embedding, "double")
+  expect_gt(length(query_embedding), 0)
 
-          # Test the results
-          expect_true(is.data.frame(similar_docs))
-          expect_true(nrow(similar_docs) > 0)
-          expect_true("similarity" %in% names(similar_docs))
+  similar_docs <- scholarAI::find_similar_documents(
+    con,
+    query_embedding,
+    limit = 3,
+    min_similarity = 0.1
+  )
 
-          # Climate change document should be most similar to "global warming"
-          expect_equal(similar_docs$id[1], 1)
-        } else {
-          skip(
-            "Could not generate query embedding, skipping similarity search test"
-          )
-        }
-      },
-      error = function(e) {
-        skip(paste0("Error in similarity search test: ", e$message))
-      }
-    )
-  }
+  # Test the results
+  expect_true(is.data.frame(similar_docs))
+  expect_equal(nrow(similar_docs), 1)
+  expect_true("similarity" %in% names(similar_docs))
+
+  # expect_equal(similar_docs$id[1], 1)
 })

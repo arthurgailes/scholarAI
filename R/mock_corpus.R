@@ -18,6 +18,7 @@ make_mock_corpus_metadata <- function(
   date = NULL,
   folder = NULL,
   filename = NULL,
+  root_dir = NULL,
   ...
 ) {
   # Sensible defaults for reproducible tests
@@ -25,7 +26,8 @@ make_mock_corpus_metadata <- function(
   url <- url %||% paste0("https://example.com/", seq_len(n))
   authors <- authors %||% rep("Author A", n)
   date <- date %||% format(Sys.Date() - seq_len(n), "%Y-%m-%d")
-  folder <- folder %||% file.path(tempdir(), paste0("article", seq_len(n)))
+  root_dir <- root_dir %||% tempdir()
+  folder <- folder %||% file.path(root_dir, paste0("article", seq_len(n)))
   filename <- filename %||% rep("text.txt", n)
 
   df <- data.frame(
@@ -49,7 +51,7 @@ make_mock_corpus_metadata <- function(
 
 make_mock_corpus_df <- function(..., content) {
   df <- make_mock_corpus_metadata()
-  df$content <- paste0("Some text", nrow(df))
+  df$content <- paste0("Document ", seq_len(nrow(df)), " about topic.")
   return(df)
 }
 
