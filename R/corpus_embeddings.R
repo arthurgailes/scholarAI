@@ -106,14 +106,6 @@ corpus_embeddings <- function(
 
   cli::cli_alert_info("Processing {total_docs} documents in {batches} batches")
 
-  # Log all ids and content lengths for debugging
-  all_docs <- DBI::dbGetQuery(
-    con,
-    "SELECT id, title, LENGTH(content) as content_length FROM corpus"
-  )
-  cli::cli_alert_info("All documents in corpus:")
-  print(all_docs)
-
   # Track total embeddings generated
   total_embeddings_generated <- 0
 
@@ -380,7 +372,7 @@ chunk_text <- function(text, max_tokens = 8000, overlap_tokens = 200) {
     return(list(text))
   }
 
-  chunks <- list()
+  chunks <- character()
   start <- 1
   while (start <= nchar(text)) {
     end <- min(start + max_chars - 1, nchar(text))
@@ -398,7 +390,6 @@ generate_embeddings <- function(
 ) {
   # This will hold the final embedding for each document (text)
   final_embeddings <- list()
-
   for (text in texts) {
     if (is.na(text) || text == "") {
       final_embeddings <- append(final_embeddings, list(NA))
@@ -407,7 +398,6 @@ generate_embeddings <- function(
 
     # Estimate tokens and chunk if necessary
     # A simple proxy for token count
-    # TODO: Replace with a proper tokenizer if available
     estimated_tokens <- nchar(text) / 4
 
     if (estimated_tokens > 8190) {
