@@ -15,17 +15,11 @@ load_vss <- function(con){
       # First check if the extension exists
       extensions <- DBI::dbGetQuery(con, "SELECT * FROM duckdb_extensions() WHERE extension_name = 'vss'")
 
-      if (nrow(extensions) > 0) {
-        # Try to load it if it exists
+      if (nrow(extensions) == 0 || isFALSE(extensions$loaded)) {
         DBI::dbExecute(con, "INSTALL vss")
         DBI::dbExecute(con, "LOAD vss")
-
-        # Verify it's loaded by checking for a VSS function
-        DBI::dbGetQuery(con, "SELECT array_cosine_distance([1,2,3], [4,5,6]) as test")
-        TRUE
-      } else {
-        FALSE
       }
+      TRUE
     },
     error = function(e) {
       FALSE
