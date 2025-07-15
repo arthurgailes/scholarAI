@@ -82,13 +82,13 @@ test_that("corpus_embeddings creates embeddings in DuckDB", {
   query_embedding <- scholarAI::get_text_embedding(query)
 
   expect_type(query_embedding, "double")
-  expect_gt(length(query_embedding), 0)
+  expect_equal(length(query_embedding), 1536)
 
   similar_docs <- scholarAI::find_similar_documents(
     con,
     query_embedding,
     limit = 3,
-    min_similarity = 0.1
+    min_similarity = 0.3
   )
 
   # Test the results
@@ -96,5 +96,5 @@ test_that("corpus_embeddings creates embeddings in DuckDB", {
   expect_equal(nrow(similar_docs), 1)
   expect_true("similarity" %in% names(similar_docs))
 
-  # expect_equal(similar_docs$id[1], 1)
+  expect_equal(similar_docs$id[1], 1)
 })

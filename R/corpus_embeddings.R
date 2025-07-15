@@ -59,6 +59,9 @@ corpus_embeddings <- function(
     ))
   }
 
+  corpus_has_id <- any(DBI::dbListFields(con, "corpus") == "id")
+  if (!corpus_has_id) stop("Corpus needs an 'id' column")
+
   # Check for API key
   if (is.null(api_key)) {
     api_key <- Sys.getenv("OPENAI_API_KEY")
@@ -71,38 +74,8 @@ corpus_embeddings <- function(
   }
   # Add Vector Similarity Search extension if requested
   if (add_vss) {
-    cli::cli_alert_info("Adding Vector Similarity Search extension to DuckDB")
-    vss_available <- FALSE
+    vss_available <- load_vss(con)
 
-    # First check if VSS is already installed
-    extensions_query <- tryCatch(
-      DBI::dbGetQuery(
-        con,
-        "SELECT name FROM duckdb_extensions() WHERE name = 'vss'"
-      ),
-      error = function(e) data.frame(name = character(0))
-    )
-
-    # Try to install VSS extension
-    tryCatch(
-      {
-        DBI::dbExecute(con, "INSTALL vss")
-        DBI::dbExecute(con, "LOAD vss")
-        vss_available <- TRUE
-        cli::cli_alert_success(
-          "Successfully installed and loaded Vector Similarity Search extension"
-        )
-      },
-      error = function(e) {
-        cli::cli_warn(c(
-          "!" = "Failed to install Vector Similarity Search extension.",
-          "i" = "You may need to manually install it or use a newer version of DuckDB.",
-          "i" = "Error: {as.character(e)}"
-        ))
-      }
-    )
-
-    # Store VSS availability for later use
     attr(con, "vss_available") <- vss_available
   }
 
@@ -133,10 +106,10 @@ corpus_embeddings <- function(
 
   cli::cli_alert_info("Processing {total_docs} documents in {batches} batches")
 
-  # Log all rowids and content lengths for debugging
+  # Log all ids and content lengths for debugging
   all_docs <- DBI::dbGetQuery(
     con,
-    "SELECT rowid, title, LENGTH(content) as content_length FROM corpus"
+    "SELECT id, title, LENGTH(content) as content_length FROM corpus"
   )
   cli::cli_alert_info("All documents in corpus:")
   print(all_docs)
@@ -155,9 +128,9 @@ corpus_embeddings <- function(
     )
 
     # Get batch data - don't filter out NULL content yet
-    # Note: DuckDB rowids are 1-based in our implementation
+    # Note: DuckDB ids are 1-based in our implementation
     query <- paste0(
-      "SELECT rowid, title, content FROM corpus ",
+      "SELECT id, title, content FROM corpus ",
       "LIMIT ",
       batch_size,
       " OFFSET ",
@@ -176,12 +149,12 @@ corpus_embeddings <- function(
 
     # Log which documents are being skipped
     if (sum(!valid_indices) > 0) {
-      skipped_rowids <- batch_data$rowid[!valid_indices]
+      skipped_ids <- batch_data$id[!valid_indices]
       cli::cli_alert_warning(
-        "Skipping documents with NULL/empty content: rowids {paste(skipped_rowids, collapse = ', ')}"
+        "Skipping documents with NULL/empty content: ids {paste(skipped_ids, collapse = ', ')}"
       )
-      # Log skipped rowids to console for debugging
-      print(paste("Skipped rowids:", paste(skipped_rowids, collapse = ", ")))
+      # Log skipped ids to console for debugging
+      print(paste("Skipped ids:", paste(skipped_ids, collapse = ", ")))
     }
 
     # Skip batch if no valid content
@@ -220,13 +193,14 @@ corpus_embeddings <- function(
       next
     }
 
-    # Create data frame for insertion
+    # Align IDs with successfully generated embeddings after filtering
+    filtered_ids <- valid_data$id[valid_embeddings_indices]
     embedding_df <- data.frame(
-      id = valid_data$rowid,
+      id = filtered_ids,
       stringsAsFactors = FALSE
     )
 
-    # Add embeddings as a list column
+    # Add embeddings as a list column (same length as filtered_ids)
     embedding_df$embedding <- embedding_arrays
 
     # Log embedding data before insertion
@@ -234,7 +208,7 @@ corpus_embeddings <- function(
       "Attempting to insert {nrow(embedding_df)} embeddings for batch {i}"
     )
     cli::cli_alert_info(
-      "Rowids to insert: {paste(embedding_df$id, collapse = ', ')}"
+      "ids to insert: {paste(embedding_df$id, collapse = ', ')}"
     )
 
     # Use dbAppendTable for direct insertion
@@ -252,9 +226,22 @@ corpus_embeddings <- function(
         cli::cli_alert_warning("Bulk insert failed: {e$message}")
         cli::cli_alert_info("Falling back to individual inserts")
 
-        # Fallback to individual inserts
+        # Fallback to individual inserts – skip ids already present to avoid duplicates
+        existing_ids <- DBI::dbGetQuery(
+          con,
+          sprintf(
+            "SELECT id FROM embeddings WHERE id IN (%s)",
+            paste(embedding_df$id, collapse = ",")
+          )
+        )$id
         success_count <- 0
         for (j in seq_len(nrow(embedding_df))) {
+          if (embedding_df$id[j] %in% existing_ids) {
+            cli::cli_alert_info(
+              "Skipping duplicate id {embedding_df$id[j]} detected during fallback"
+            )
+            next
+          }
           tryCatch(
             {
               # Fallback should use the same prepared data frame logic if possible
@@ -276,7 +263,7 @@ corpus_embeddings <- function(
             },
             error = function(e2) {
               cli::cli_alert_danger(
-                "Error inserting embedding {j} (rowid {embedding_df$id[j]}): {e2$message}"
+                "Error inserting embedding {j} (id {embedding_df$id[j]}): {e2$message}"
               )
             }
           )
@@ -303,8 +290,8 @@ corpus_embeddings <- function(
     cli::cli_alert_warning(
       "{total_docs - final_count} documents are missing embeddings"
     )
-    # Get rowids that are missing embeddings
-    missing_query <- "SELECT c.rowid, c.title FROM corpus c LEFT JOIN embeddings e ON c.rowid = e.id WHERE e.id IS NULL"
+    # Get ids that are missing embeddings
+    missing_query <- "SELECT c.id, c.title FROM corpus c LEFT JOIN embeddings e ON c.id = e.id WHERE e.id IS NULL"
     missing_docs <- DBI::dbGetQuery(con, missing_query)
     cli::cli_alert_info("Documents missing embeddings:")
     print(missing_docs)
@@ -356,27 +343,11 @@ corpus_embeddings <- function(
         }
       },
       error = function(e) {
-        # Check if this is a persistence-related error
-        is_persistence_error <- grepl(
-          "in-memory|persistence",
-          tolower(as.character(e)),
-          ignore.case = TRUE
-        )
-
-        if (is_persistence_error) {
-          cli::cli_warn(c(
-            "!" = "Failed to create vector similarity search index due to persistence settings.",
-            "i" = "Vector similarity searches may be slower.",
-            "i" = "Error: {as.character(e)}",
-            "i" = "The HNSW index requires either an in-memory database or the 'hnsw_enable_experimental_persistence' option."
-          ))
-        } else {
-          cli::cli_warn(c(
-            "!" = "Failed to create vector similarity search index.",
-            "i" = "Vector similarity searches may be slower.",
-            "i" = "Error: {as.character(e)}"
-          ))
-        }
+        cli::cli_warn(c(
+          "!" = "Failed to create vector similarity search index.",
+          "i" = "Vector similarity searches may be slower.",
+          "i" = "Error: {as.character(e)}"
+        ))
       }
     )
   } else {

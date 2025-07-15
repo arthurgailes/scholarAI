@@ -31,6 +31,7 @@ make_mock_corpus_metadata <- function(
   filename <- filename %||% rep("text.txt", n)
 
   df <- data.frame(
+    id = seq_len(n),
     title = title,
     url = url,
     authors = authors,
