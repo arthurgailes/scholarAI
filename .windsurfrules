@@ -9,12 +9,13 @@
 - Documentation uses roxygen2 format
 - Test files should be placed in tests/ directory
 - Use pkg::fun inside functions, not library(pkg)
-- Keep functions short and single-purpose.
+- Keep functions short (<50 lines) and single-purpose.
 - Prefer base R in functions, unless necessary or base R would be at least 5x more code
+- KISS - keep it simple and succinct
 
 * **Object names** – use lower-case `snake_case`; functions are verbs (`add_row()`), data objects are nouns (`model_df`).  
-* **File layout** – one exported function per file when possible; helpers follow the public function in the same file.  
-* **Function signatures** – first argument is the primary data object; required args have no defaults; wrap long signatures one arg per line with 2-space indents.  
+* **File layout** – one exported function per file when possible; helpers follow the public function in the same file.  Try to keep functions <40 lines
+* **Function signatures** – first argument is the primary data object; required args have no defaults; wrap long signatures one arg per line with 2-space indents.
 * **Comments** – explain **why**, not what; sentence-case lines starting with `# ` and separated from code by a blank line.  
 * **Errors & messages** – use give simple error messages with minimal code.  
 * **API consistency** – design for human-centred, consistent, composable, inclusive interfaces (the four tidy-design principles).  
@@ -23,6 +24,7 @@
 ## Testing
 - Use testthat for testing
 - You need Rscript to run R and tests, eg `Rscript -e "devtools::test()"`
+- The purpose of testing is to find and fix problems in the code, not to write tests that pass. Do not `skip` actual problems.
 
 ## Misc
 - This is not going to CRAN
