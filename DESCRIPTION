@@ -16,10 +16,10 @@ Imports:
     ellmer,
     httr,
     pdftools,
-    reticulate,
     rvest,
     xml2,
     yyjsonr
 Suggests: 
     testthat
+    
 RoxygenNote: 7.3.2
