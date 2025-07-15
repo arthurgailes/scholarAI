@@ -43,7 +43,7 @@ get_openai_embeddings <- function(
     numeric(emb_dim)
   ))
   rownames(mat) <- NULL
-  
+
   mat
 }
 
@@ -85,7 +85,15 @@ get_single_embedding <- function(
 }
 
 check_embedding_input <- function(texts, openai_key, max_attempts, pause_sec) {
-  if (!is.character(texts)) stop("texts must be a character vector")
+  if (!is.character(texts)) {
+    cli::cli_abort(
+      c(
+        "x" = "{.arg texts} must be a character vector.",
+        "!" = "You supplied an object of type {.cls {class(texts)}}.",
+        "i" = "First few values: {.val {head(substr(texts, 1, 50), 3)}}"
+      )
+    )
+  }
   if (!nzchar(openai_key)) stop("No OpenAI API key provided.")
   if (!is.numeric(max_attempts) || max_attempts < 1)
     stop("max_attempts must be >= 1")
