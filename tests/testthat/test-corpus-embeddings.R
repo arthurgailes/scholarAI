@@ -46,10 +46,6 @@ test_that("corpus_embeddings creates embeddings in DuckDB", {
   db_path <- file.path(corpus_dir, "corpus.duckdb")
   scholarAI::corpus_to_duckdb(corpus_dir)
 
-  # con <- DBI::dbConnect(duckdb::duckdb(db_path))
-  # head(DBI::dbReadTable(con, "corpus"))
-  # DBI::dbDisconnect(con, shutdown = TRUE)
-
   # Run corpus_embeddings
   scholarAI::corpus_embeddings(db_path, batch_size = 2)
 

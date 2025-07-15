@@ -10,8 +10,6 @@ scrape_results <- NULL
 corpus_df <- NULL
 metadata_path <- NULL
 db_path <- NULL
-# Try to source setup.R, but continue if not found
-try(source("setup.R"), silent = TRUE)
 
 test_that("env is ready", {
   expect_true(
@@ -24,26 +22,11 @@ test_that("env is ready", {
   )
 })
 
-# Check if we're online and can reach AEI
-tryCatch(
-  {
-    response <- httr::GET("https://www.aei.org", httr::timeout(5))
-    if (httr::http_error(response)) {
-      cli::cli_abort(c(
-        "Cannot access AEI website.",
-        "x" = "HTTP status: {httr::status_code(response)}",
-        "i" = "Check your internet connection and try again."
-      ))
-    }
-  },
-  error = function(e) {
-    cli::cli_abort(c(
-      "This script requires internet access and the AEI website to be available.",
-      "x" = "{e$message}",
-      "i" = "Check your internet connection and try again."
-    ))
-  }
-)
+# Check AEI website availability
+ok <- try(httr::GET("https://www.aei.org", httr::timeout(5)), silent = TRUE)
+if (inherits(ok, "try-error") || httr::http_error(ok)) {
+  cli::cli_abort("Cannot access AEI website. Check your internet connection.")
+}
 
 # Create a directory for our real-world implementation
 out_dir <- file.path(
@@ -173,18 +156,18 @@ test_that("DuckDB corpus contains valid content", {
 
   # Check that a good portion of the content is not NULL and has length
   content_check <- DBI::dbGetQuery(con, "
-    SELECT 
+    SELECT
       CAST(SUM(CASE WHEN content IS NOT NULL AND LENGTH(content) > 100 THEN 1 ELSE 0 END) AS DOUBLE) / COUNT(*) as ratio_with_content,
       AVG(LENGTH(content)) as avg_content_length
     FROM corpus
   ")
-  
+
   # Expect at least 80% of documents to have substantial content
-  expect_gt(content_check$ratio_with_content, 0.8, 
+  expect_gt(content_check$ratio_with_content, 0.8,
             label = "Ratio of documents with content > 100 chars")
-  
+
   # Expect average content length to be substantial (e.g., > 500 chars)
-  expect_gt(content_check$avg_content_length, 500, 
+  expect_gt(content_check$avg_content_length, 500,
             label = "Average content length")
 })
 

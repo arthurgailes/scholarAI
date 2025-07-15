@@ -34,7 +34,7 @@ save_corpus_metadata <- function(
 
   out_path <- file.path(root_dir, file_name)
   yyjsonr::write_json_file(df, out_path, pretty = TRUE, auto_unbox = TRUE)
-  invisible(df)
+  return(out_path)
 }
 
 
