@@ -155,36 +155,30 @@ corpus_to_duckdb <- function(
         folder_path <- batch_data$folder[j]
 
         # Check for the text files in the specified folder path.
-        text_file <- file.path(folder_path, "text.txt")
-        article_text_file <- file.path(folder_path, "article_text.txt")
+        # Find all text files in the directory
+        text_files <- list.files(
+          folder_path,
+          pattern = "\\.txt$",
+          full.names = TRUE
+        )
 
-        # Check which file exists and use that one
-        if (file.exists(text_file)) {
-          # Read text content from text.txt
-          text_content <- readLines(text_file, warn = FALSE)
-          text_content <- paste(text_content, collapse = "\n")
-
-          # Update batch data
-          batch_data$file_path[j] <- text_file
-          batch_data$content[j] <- text_content
-        } else if (file.exists(article_text_file)) {
-          # Read text content from article_text.txt
-          text_content <- readLines(article_text_file, warn = FALSE)
-          text_content <- paste(text_content, collapse = "\n")
-
-          # Update batch data
-          batch_data$file_path[j] <- article_text_file
-          batch_data$content[j] <- text_content
-        } else {
-          cli::cli_warn(c(
-            "!" = "Text file not found for document {offset + j}.",
-            "i" = paste0(
-              "Expected either: ",
-              text_file,
-              " or ",
-              article_text_file
-            )
+        if (length(text_files) == 0) {
+          # Error if no text files found
+          cli::cli_abort(c(
+            "x" = "No text files found in directory for document {offset + j}.",
+            "i" = "Directory path: {folder_path}"
           ))
+        } else {
+          # Get file sizes and find the largest one
+          file_sizes <- file.info(text_files)$size
+          largest_file <- text_files[which.max(file_sizes)]
+
+          # Read and clean text content from the largest file
+          text_content <- read_and_clean_text(largest_file)
+
+          # Update batch data
+          batch_data$file_path[j] <- largest_file
+          batch_data$content[j] <- text_content
         }
       } else {
         cli::cli_warn(c(
@@ -226,4 +220,35 @@ corpus_to_duckdb <- function(
     "Database created at {.path {db_path}}. Connect with: {.code con <- DBI::dbConnect(duckdb::duckdb(), '{db_path}')}"
   )
   invisible(db_path)
+}
+
+#' Read and clean text from a file
+#'
+#' Reads text content from a file and performs basic cleaning operations.
+#'
+#' @param file_path Path to the text file to read
+#' @return A character string containing the cleaned text content
+#'
+#' @keywords internal
+read_and_clean_text <- function(file_path) {
+  # Read file content
+  text_content <- readLines(file_path, warn = FALSE)
+
+  # Combine lines with newline characters
+  text_content <- paste(text_content, collapse = "\n")
+
+  # Trim leading and trailing whitespace
+  text_content <- trimws(text_content)
+
+  # Normalize consecutive whitespace (but preserve single spaces)
+  text_content <- gsub("[ \t]{2,}", " ", text_content)
+
+  # Only remove null bytes and truly problematic control characters
+  # This preserves all normal text characters
+  text_content <- gsub("\uFFFD|<U\\+FFFD>", "", text_content)
+
+  # Normalize line endings to \n
+  text_content <- gsub("\\r\\n|\\r", "\\n", text_content)
+
+  return(text_content)
 }

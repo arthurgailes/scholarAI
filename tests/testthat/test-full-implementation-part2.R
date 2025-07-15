@@ -19,30 +19,6 @@ out_dir <- file.path(
 db_path <- file.path(out_dir, "corpus.duckdb")
 metadata_path <- file.path(out_dir, "corpus_metadata.json")
 
-# Skip all tests if the database doesn't exist
-if (!file.exists(db_path)) {
-  message(
-    "Database not found at ",
-    db_path,
-    ". Run test-full-implementation-part1.R first."
-  )
-  return(invisible(NULL))
-}
-
-# Verify the output directory exists
-if (!dir.exists(out_dir)) {
-  message(
-    "Output directory not found at ",
-    out_dir,
-    ". Run test-full-implementation-part1.R first."
-  )
-  return(invisible(NULL))
-}
-
-# Print loaded paths for debugging
-message("Loaded output directory: ", out_dir)
-message("Loaded database path: ", db_path)
-message("Loaded metadata path: ", metadata_path)
 
 test_that("env is ready", {
   expect_true(
@@ -53,6 +29,10 @@ test_that("env is ready", {
     Sys.getenv("OPENROUTER_API_KEY") != "",
     "OpenAI API key not available"
   )
+
+  expect_true(file.exists(db_path), "Need to create db")
+  expect_true(dir.exists(out_dir), "Need to create directory")
+
 })
 
 test_that("Part 1 results are available", {

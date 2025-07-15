@@ -2,7 +2,7 @@
 #'
 #' TODO: optionally use `tokenizer` to count actual tokens
 n_token <- function(text, method = 'approximate') {
-  if (method == 'approximate') return(nchar(text) / 4) else
+  if (method == 'approximate') return(nchar(text) / 3) else
     stop("Method not recognized")
 }
 

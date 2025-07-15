@@ -398,7 +398,7 @@ generate_embeddings <- function(
 
     # Estimate tokens and chunk if necessary
     # A simple proxy for token count
-    estimated_tokens <- nchar(text) / 4
+    estimated_tokens <- n_token(text)
 
     if (estimated_tokens > 8190) {
       # text-embedding-3-small max is 8191
