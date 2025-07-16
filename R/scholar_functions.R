@@ -67,6 +67,7 @@ generate_scholar_function <- function(
 #' @param prompt_model Character string specifying the LLM model to use
 #' @param output_dir Directory where the corpus is stored. If NULL, will try to load from config.
 #' @param config_path Path to the configuration file
+#' @param custom_file Path to the custom.R file to create. If NULL, will be created in the parent directory of output_dir.
 #' @param progress Whether to display progress information
 #'
 #' @return A list containing the path to the custom.R file and the names of generated functions
@@ -78,6 +79,7 @@ generate_scholar_functions <- function(
   prompt_model = "anthropic/claude-sonnet-4",
   output_dir = NULL,
   config_path = "./scholarai_config.yml",
+  custom_file = NULL,
   progress = TRUE
 ) {
   # Try to load configuration if parameters are NULL
@@ -117,9 +119,14 @@ generate_scholar_functions <- function(
     }
   }
   
-  # Create custom.R file in the project root
-  custom_file <- file.path(dirname(output_dir), "custom.R")
+  # Create custom.R file path if not provided
+  if (is.null(custom_file)) {
+    custom_file <- file.path(dirname(output_dir), "custom.R")
+  }
   if (progress) cli::cli_alert_info("Creating custom.R file at {.path {custom_file}}")
+  
+  # Ensure directory exists
+  dir.create(dirname(custom_file), showWarnings = FALSE, recursive = TRUE)
   
   # Start with header content
   custom_content <- c(

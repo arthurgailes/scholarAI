@@ -35,6 +35,12 @@ save_scholar_config <- function(
     last_updated = format(Sys.time(), "%Y-%m-%d %H:%M:%S")
   )
   
+  # Ensure directory exists for config file
+  config_dir <- dirname(config_path)
+  if (!dir.exists(config_dir)) {
+    dir.create(config_dir, recursive = TRUE, showWarnings = FALSE)
+  }
+  
   # Write config to YAML file
   yaml::write_yaml(config, config_path)
   

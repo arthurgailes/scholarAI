@@ -1,5 +1,6 @@
 # Real-world implementation of the scholarAI workflow (Part 1)
-# This file runs steps 1-4 of the pipeline with real data (no mocks)
+# This file runs steps 0-4 of the pipeline with real data (no mocks)
+# 0. Save initial configuration
 # 1. Scrape AEI articles
 # 2. Convert corpus to dataframe
 # 3. Save corpus metadata
@@ -10,6 +11,7 @@ scrape_results <- NULL
 corpus_df <- NULL
 metadata_path <- NULL
 db_path <- NULL
+config_path <- NULL
 
 test_that("env is ready", {
   expect_true(
@@ -28,16 +30,41 @@ if (inherits(ok, "try-error") || httr::http_error(ok)) {
   cli::cli_abort("Cannot access AEI website. Check your internet connection.")
 }
 
-# Create a directory for our real-world implementation
-out_dir <- file.path(
-  testthat::test_path(),
-  "test_data",
-  "real_world_implementation"
-)
+# Define paths
+out_dir <- "./test_data/real_world_implementation"
+db_path <- file.path(out_dir, "corpus.duckdb")
+metadata_path <- file.path(out_dir, "metadata.rds")
+prompt_path <- file.path(out_dir, "scholar_instructions.md")
+config_path <- file.path(out_dir, "scholarai_config.yml")  # Config in test directory
 
 # Clear the directory at the start
 if (dir.exists(out_dir)) unlink(out_dir, recursive = TRUE)
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+
+# Step 0: Save initial configuration
+message("STEP 0: Saving initial configuration")
+
+# Create a configuration file
+config_path <- scholarAI::save_scholar_config(
+  output_dir = out_dir,
+  authors = "Tobias%20Peter",
+  progress = FALSE
+)
+
+# Print config file info
+message("Configuration saved to: ", config_path)
+
+test_that("Configuration can be saved", {
+  # Test assertions
+  expect_true(file.exists(config_path))
+  
+  # Load the config to verify it contains expected values
+  config <- scholarAI::load_scholar_config(config_path, progress = FALSE)
+  
+  # Use normalizePath to ensure consistent path comparison
+  expect_equal(normalizePath(config$output_dir), normalizePath(out_dir))
+  expect_equal(config$authors, "Tobias%20Peter")
+})
 
 # Step 1: Scrape AEI articles for a specific author
 # Using Tobias Peter as the test author, limiting to 2 pages for reasonable test time
@@ -171,8 +198,21 @@ test_that("DuckDB corpus contains valid content", {
             label = "Average content length")
 })
 
+# Update configuration with paths
+message("Updating configuration with paths")
+
+# Update configuration with database path
+scholarAI::save_scholar_config(
+  output_dir = out_dir,
+  authors = "Tobias%20Peter",
+  db_path = db_path,
+  config_path = config_path,
+  progress = FALSE
+)
+
 # Print summary of part 1
 message("Real-world implementation part 1 completed successfully")
 message("Output directory: ", out_dir)
 message("Database path: ", db_path)
 message("Number of articles scraped: ", nrow(scrape_results))
+message("Configuration path: ", config_path)

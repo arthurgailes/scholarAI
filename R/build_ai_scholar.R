@@ -12,6 +12,7 @@
 #' @param prompt_model The LLM model to use for generating the scholar instructions.
 #'   Default is "anthropic/claude-sonnet-4".
 #' @param progress Whether to display progress information. Default is TRUE.
+#' @param custom_file Path to the custom.R file to create. If NULL, will be created in the parent directory of output_dir.
 #'
 #' @return Invisibly returns a list with paths to all created artifacts.
 #' @export
@@ -21,7 +22,8 @@ build_ai_scholar <- function(
   max_pages = 2000,
   embedding_model = "text-embedding-3-small",
   prompt_model = "anthropic/claude-sonnet-4",
-  progress = TRUE
+  progress = TRUE,
+  custom_file = NULL
 ) {
   # Input validation
   if (missing(authors) || length(authors) == 0) {
@@ -36,6 +38,14 @@ build_ai_scholar <- function(
     dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   }
 
+  # Step 0: Save configuration (not counted in test numbering)
+  if (progress) cli::cli_h1("Step 0: Saving configuration")
+  config_path <- save_scholar_config(
+    output_dir = output_dir,
+    authors = authors,
+    progress = progress
+  )
+  
   # Step 1: Scrape AEI articles
   if (progress) cli::cli_h1("Step 1: Scraping AEI articles")
   scrape_results <- scrape_aei(
@@ -73,6 +83,34 @@ build_ai_scholar <- function(
     model = prompt_model,
     output_path = file.path(output_dir, "scholar_instructions.md")
   )
+  
+  # Step 7: Generating scholar-specific functions
+  if (progress) cli::cli_h1("Step 7: Generating scholar-specific functions")
+  
+  # Update the configuration with the latest paths
+  save_scholar_config(
+    output_dir = output_dir,
+    authors = authors,
+    db_path = db_path,
+    config_path = config_path,
+    progress = progress
+  )
+  
+  # Generate scholar-specific functions and create custom.R file
+  scholar_result <- generate_scholar_functions(
+    authors = authors,
+    db_path = db_path,
+    prompt_path = prompt_path,
+    prompt_model = prompt_model,
+    output_dir = output_dir,
+    config_path = config_path,
+    custom_file = custom_file,
+    progress = progress
+  )
+  
+  # Extract results
+  custom_file <- scholar_result$custom_file
+  scholar_functions <- scholar_result$scholar_functions
 
   # Print summary if progress is enabled
   if (progress) {
@@ -90,6 +128,8 @@ build_ai_scholar <- function(
     db_path = db_path,
     metadata_path = metadata_path,
     prompt_path = prompt_path,
-    scrape_results = scrape_results
+    custom_file = custom_file,
+    scrape_results = scrape_results,
+    scholar_functions = names(scholar_functions)
   ))
 }
