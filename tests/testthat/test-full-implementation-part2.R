@@ -113,6 +113,7 @@ test_that("Scholar prompt can be built", {
   # Build the scholar prompt
   prompt_path <- scholarAI::build_scholar_prompt(
     corpus_path = out_dir,
+    authors = "Tobias Peter",
     model = "google/gemini-2.5-flash",
     output_path = file.path(out_dir, "scholar_instructions.md")
   )
