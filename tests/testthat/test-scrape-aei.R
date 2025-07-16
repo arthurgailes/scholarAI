@@ -7,7 +7,6 @@ library(xml2)
 library(rvest)
 library(httr)
 library(mockery)
-library(jsonlite)
 
 ## -------------------------------------------------------------------------
 context("get_author_links")
@@ -129,7 +128,7 @@ test_that("scrape_aei processes articles with mocked functions", {
       date = mock_metadata$date[i],
       authors = list(mock_metadata$author[i])
     )
-    jsonlite::write_json(metadata, file.path(article_dir, "metadata.json"))
+    yyjsonr::write_json_file(metadata, file.path(article_dir, "metadata.json"))
 
     # Create text.txt
     writeLines(
@@ -172,7 +171,7 @@ test_that("scrape_aei processes articles with mocked functions", {
     file.exists(out_json),
     "corpus_metadata.json should be written to output root"
   )
-  json_data <- jsonlite::read_json(out_json, simplifyVector = TRUE)
+  json_data <- yyjsonr::read_json_file(out_json, simplifyVector = TRUE)
   expect_true(is.data.frame(json_data), "JSON output should be a data frame")
   expect_equal(nrow(json_data), 2)
 })

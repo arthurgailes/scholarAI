@@ -164,7 +164,7 @@ corpus_to_duckdb <- function(
 
         if (length(text_files) == 0) {
           # Error if no text files found
-          cli::cli_abort(c(
+          cli::cli_warn(c(
             "x" = "No text files found in directory for document {offset + j}.",
             "i" = "Directory path: {folder_path}"
           ))
