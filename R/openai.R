@@ -55,6 +55,14 @@ get_single_embedding <- function(
   max_attempts = 3,
   pause_sec = 0.1
 ) {
+  if (is.na(txt) || txt == "") {
+    cli::cli_warn("Empty or NA text provided to get_single_embedding")
+    return(NA)
+  }
+  
+  # Truncate very long text for warning messages (used in error messages below)
+  display_txt <- if (nchar(txt) > 50) paste0(substr(txt, 1, 50), "...") else txt
+  
   attempt <- 1
   repeat {
     resp <- tryCatch(
@@ -67,18 +75,78 @@ get_single_embedding <- function(
           auto_unbox = TRUE
         )
       ),
-      error = function(e) e
+      error = function(e) {
+        cli::cli_warn(c(
+          "!" = "HTTP error in OpenAI API call: {as.character(e)}",
+          "i" = "Attempt {attempt}/{max_attempts}"
+        ))
+        return(e)
+      }
     )
-    if (inherits(resp, "response") && httr::status_code(resp) == 200) {
-      return(as.numeric(httr::content(resp)$data[[1]]$embedding))
+    
+    # Check if response is an error object
+    if (inherits(resp, "error")) {
+      if (attempt >= max_attempts) {
+        cli::cli_warn(c(
+          "!" = "Failed to get embedding after {max_attempts} attempts due to HTTP error",
+          "i" = "Text: '{display_txt}'"
+        ))
+        return(NA)
+      }
+    } 
+    # Check if response is a valid HTTP response
+    else if (inherits(resp, "response")) {
+      if (httr::status_code(resp) == 200) {
+        # Success case
+        content <- tryCatch(
+          httr::content(resp),
+          error = function(e) {
+            cli::cli_warn(c(
+              "!" = "Failed to parse API response: {as.character(e)}",
+              "i" = "Status code was 200 but content parsing failed"
+            ))
+            return(NULL)
+          }
+        )
+        
+        if (!is.null(content) && !is.null(content$data) && 
+            length(content$data) > 0 && !is.null(content$data[[1]]$embedding)) {
+          return(as.numeric(content$data[[1]]$embedding))
+        } else {
+          cli::cli_warn(c(
+            "!" = "API response missing expected embedding data",
+            "i" = "Response structure may have changed"
+          ))
+        }
+      } else {
+        # Non-200 status code
+        status_code <- httr::status_code(resp)
+        content <- tryCatch(httr::content(resp), error = function(e) NULL)
+        error_message <- if (!is.null(content) && !is.null(content$error)) {
+          content$error$message
+        } else {
+          "Unknown error"
+        }
+        
+        # Use the variables in the warning message to avoid lint warnings
+        cli::cli_warn(c(
+          "!" = "API returned status code {status_code}",
+          "i" = "Error: {error_message}",
+          "i" = "Attempt {attempt}/{max_attempts}"
+        ))
+      }
     }
+    
     if (attempt >= max_attempts) {
-      warning(sprintf(
-        "Failed to get embedding for '%s' after %d attempts; returning NA.",
-        txt, max_attempts
+      display_txt <- substr(txt, 1, 50)
+      if (nchar(txt) > 50) display_txt <- paste0(display_txt, "...")
+      cli::cli_warn(c(
+        "!" = "Failed to get embedding after {max_attempts} attempts",
+        "i" = "Text: '{display_txt}'"
       ))
-      return(NA)
+      return(rep(NA_real_, 1536))
     }
+    
     attempt <- attempt + 1
     Sys.sleep(pause_sec)
   }

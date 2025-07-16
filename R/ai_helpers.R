@@ -1,9 +1,15 @@
 #' Miscellaneous helper functions for ScholarAI
 #'
-#' TODO: optionally use `tokenizer` to count actual tokens
-n_token <- function(text, method = 'approximate') {
-  if (method == 'approximate') return(nchar(text) / 3) else
-    stop("Method not recognized")
+#' @description Token estimation function for text processing
+#' @param text Text to estimate token count for
+#' @return Estimated token count
+#' @keywords internal
+n_token <- function(text) {
+  if (is.na(text) || text == "") return(0)
+  
+  # Conservative approximation (1 token ~ 2 chars)
+  # This helps prevent exceeding token limits
+  return(ceiling(nchar(text) / 2))
 }
 
 #' Attempt to install and load VSS (HNSW index) extension

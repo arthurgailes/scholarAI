@@ -112,21 +112,18 @@ corpus_embeddings <- function(
   # Process each batch
   for (i in seq_len(batches)) {
     # Calculate batch range for logging
-    batch_start <- (i - 1) * batch_size + 1
-    batch_end <- min(i * batch_size, total_docs)
+    start_idx <- (i - 1) * batch_size + 1
+    end_idx <- min(i * batch_size, total_docs)
 
     cli::cli_alert_info(
-      "Processing batch {i}/{batches} (documents {batch_start}-{batch_end})"
+      "Processing batch {i}/{batches} (documents {start_idx}-{end_idx})"
     )
 
     # Get batch data - don't filter out NULL content yet
     # Note: DuckDB ids are 1-based in our implementation
     query <- paste0(
       "SELECT id, title, content FROM corpus ",
-      "LIMIT ",
-      batch_size,
-      " OFFSET ",
-      (i - 1) * batch_size
+      "WHERE id BETWEEN ", start_idx, " AND ", end_idx
     )
     batch_data <- DBI::dbGetQuery(con, query)
 
@@ -348,124 +345,153 @@ corpus_embeddings <- function(
       "i" = "Vector similarity searches will use the fallback method."
     ))
   }
-
+  
   # Return the path to the database invisibly
   invisible(db_path)
 }
 
+#' Chunk text into smaller pieces based on token limits
+#'
+#' @param text Text to chunk
+#' @param max_tokens Maximum tokens per chunk
+#' @param overlap_tokens Number of tokens to overlap between chunks
+#' @return Character vector of text chunks
+#' @keywords internal
+chunk_text <- function(text, max_tokens = 6000, overlap_tokens = 200) {
+  if (is.na(text) || text == "") {
+    return(character(0))
+  }
+  
+  if (n_token(text) <= max_tokens) {
+    return(text)
+  }
+  
+  chunks <- character()
+  start <- 1
+  text_length <- nchar(text)
+  
+  while (start <= text_length) {
+    # Start with a chunk that might be close to max_tokens
+    # Use a rough estimate to avoid checking token count for every character
+    end <- min(start + (max_tokens * 2) - 1, text_length)
+    chunk <- substr(text, start, end)
+    
+    # If the chunk is too large, reduce its size until it fits
+    while (n_token(chunk) > max_tokens && nchar(chunk) > 1) {
+      end <- end - 100  # Reduce by 100 chars at a time for efficiency
+      chunk <- substr(text, start, end)
+    }
+    
+    chunks <- append(chunks, chunk)
+    
+    # Move start position, accounting for overlap
+    chars_to_move <- nchar(chunk) - (overlap_tokens * 2)  # Rough char equivalent
+    start <- start + max(1, chars_to_move)  # Ensure we always advance
+    if (start > text_length) break
+  }
+  
+  # Process each chunk and handle recursive chunking
+  result_chunks <- character()
+  for (chunk in chunks) {
+    estimated_tokens <- n_token(chunk)
+    if (estimated_tokens > 7000) {
+      # Recursively chunk large chunks
+      sub_chunks <- chunk_text(chunk, max_tokens = 5000, overlap_tokens = 100)
+      result_chunks <- c(result_chunks, sub_chunks)
+    } else {
+      result_chunks <- c(result_chunks, chunk)
+    }
+  }
+  
+  return(result_chunks)
+}
 
 #' Generate embeddings for text using OpenAI API
 #'
 #' @param texts Character vector of texts to generate embeddings for
-#' @param model Model to use for embeddings, defaults to "text-embedding-3-small"
-#' @param api_key OpenAI API key.
-#' @return A numeric matrix of embeddings.
+#' @param model Model to use for embeddings
+#' @param api_key OpenAI API key
+#' @return Matrix of embeddings
 #' @keywords internal
-
-# Function to split text into chunks
-chunk_text <- function(text, max_tokens = 8000, overlap_tokens = 200) {
-  # A more conservative character count as a proxy for tokens (1 token ~ 3 chars)
-  max_chars <- max_tokens * 3
-  overlap_chars <- overlap_tokens * 3
-
-  if (nchar(text) <= max_chars) {
-    return(list(text))
-  }
-
-  chunks <- character()
-  start <- 1
-  while (start <= nchar(text)) {
-    end <- min(start + max_chars - 1, nchar(text))
-    chunks <- append(chunks, substr(text, start, end))
-    start <- start + max_chars - overlap_chars
-    if (start > nchar(text)) break
-  }
-  return(chunks)
-}
-
-generate_embeddings <- function(
-  texts,
-  model = "text-embedding-3-small",
-  api_key
-) {
-  # This will hold the final embedding for each document (text)
-  final_embeddings <- list()
-  for (text in texts) {
+generate_embeddings <- function(texts, model = "text-embedding-3-small", api_key = NULL) {
+  # Initialize empty matrix
+  result_matrix <- matrix(nrow = length(texts), ncol = 1536)
+  
+  # Process each text
+  for (i in seq_along(texts)) {
+    text <- texts[i]
+    
+    # Skip empty text
     if (is.na(text) || text == "") {
-      final_embeddings <- append(final_embeddings, list(NA))
+      result_matrix[i, ] <- NA_real_
       next
     }
-
-    # Estimate tokens and chunk if necessary
-    # A simple proxy for token count
+    
+    # Use token estimation
     estimated_tokens <- n_token(text)
-
-    if (estimated_tokens > 8190) {
-      # text-embedding-3-small max is 8191
-      text_chunks <- chunk_text(text, max_tokens = 8000)
-
-      # Get embeddings for all chunks at once
-      chunk_embeddings_matrix <- get_openai_embeddings(
-        text_chunks,
-        model = model,
-        openai_key = api_key
-      )
-
-      # Filter out failed chunks (all NA rows)
-      valid_chunk_embeddings <- chunk_embeddings_matrix[
-        !apply(chunk_embeddings_matrix, 1, function(row) all(is.na(row))),
-        ,
-        drop = FALSE
-      ]
-
-      if (nrow(valid_chunk_embeddings) > 0) {
-        # Average the embeddings of the chunks
-        avg_embedding <- colMeans(valid_chunk_embeddings, na.rm = TRUE)
-        final_embeddings <- append(final_embeddings, list(avg_embedding))
-      } else {
-        cli::cli_warn("Failed to embed any chunk for a large document.")
-        final_embeddings <- append(final_embeddings, list(NA))
+    
+    # Handle large documents by chunking
+    if (estimated_tokens > 6000) {
+      # Use chunking function
+      text_chunks <- chunk_text(text, max_tokens = 5000)
+      
+      # Verify we have chunks
+      if (length(text_chunks) == 0) {
+        result_matrix[i, ] <- NA_real_
+        next
       }
-    } else {
-      # Document is small enough, embed directly
-      embedding_vector <- get_openai_embeddings(
-        text,
-        model = model,
-        openai_key = api_key
-      )
-      if (is.matrix(embedding_vector) && nrow(embedding_vector) > 0) {
-        final_embeddings <- append(
-          final_embeddings,
-          list(embedding_vector[1, ])
+      
+      # Try to get embeddings for chunks
+      chunk_embeddings <- tryCatch({
+        get_openai_embeddings(
+          text_chunks,
+          model = model,
+          openai_key = api_key
         )
-      } else {
-        final_embeddings <- append(final_embeddings, list(NA))
+      }, error = function(e) {
+        # Try each chunk individually if batch fails
+        chunk_embeddings <- matrix(nrow = length(text_chunks), ncol = 1536)
+        for (j in seq_along(text_chunks)) {
+          chunk_embeddings[j, ] <- tryCatch({
+            get_openai_embeddings(
+              text_chunks[j],
+              model = model,
+              openai_key = api_key
+            )[1, ]
+          }, error = function(e) {
+            return(rep(NA_real_, 1536))
+          })
+        }
+        return(chunk_embeddings)
+      })
+      
+      # Remove any NA rows
+      valid_rows <- !apply(chunk_embeddings, 1, function(row) all(is.na(row)))
+      if (sum(valid_rows) == 0) {
+        result_matrix[i, ] <- NA_real_
+        next
       }
-    }
-  }
-
-  # Determine embedding dimension from the first successful embedding
-  first_valid_embedding <- Filter(
-    function(x) !is.null(x) && !all(is.na(x)),
-    final_embeddings
-  )
-  if (length(first_valid_embedding) == 0) {
-    # If all embeddings failed, we can't determine dimension. Return empty matrix.
-    # The calling function should handle this gracefully.
-    return(matrix(numeric(0), 0, 0))
-  }
-  emb_dim <- length(first_valid_embedding[[1]])
-
-  # Convert list to matrix, handling NAs
-  embedding_matrix <- t(sapply(final_embeddings, function(emb) {
-    if (is.numeric(emb) && length(emb) == emb_dim) {
-      emb
+      
+      # Average the embeddings of valid chunks
+      valid_embeddings <- chunk_embeddings[valid_rows, , drop = FALSE]
+      result_matrix[i, ] <- colMeans(valid_embeddings, na.rm = TRUE)
     } else {
-      rep(NA_real_, emb_dim)
+      # For smaller documents, get embedding directly
+      embedding_vector <- tryCatch({
+        get_openai_embeddings(
+          text,
+          model = model,
+          openai_key = api_key
+        )
+      }, error = function(e) {
+        return(matrix(NA_real_, nrow = 1, ncol = 1536))
+      })
+      
+      result_matrix[i, ] <- embedding_vector[1, ]
     }
-  }))
-
-  return(embedding_matrix)
+  }
+  
+  return(result_matrix)
 }
 
 #' Get embedding for a single text
