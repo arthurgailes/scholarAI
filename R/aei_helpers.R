@@ -1,11 +1,5 @@
-#' AEI scraping helpers and utilities
-#'
-#' @description
-#' Helper and utility functions for AEI scraping pipeline (folder name, regex, etc).
-#' Not exported.
-#'
-#' @keywords internal
-NULL
+# AEI scraping helpers and utilities
+
 
 #' Convert a URL path into a safe folder name (one nested level allowed)
 #'

@@ -1,10 +1,4 @@
-#' AEI extraction and download logic
-#'
-#' @description
-#' Core functions for extracting metadata, text, and PDFs from AEI.org articles.
-#' Not exported directly; used by scraping pipeline.
-#' @keywords internal
-NULL
+# AEI extraction and download logic
 
 #' Extract title, date & author from article html
 #' @param article_html xml2 document

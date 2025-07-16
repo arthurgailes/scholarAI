@@ -8,19 +8,19 @@
 #' @param output_dir Path to the directory where all outputs will be stored.
 #'   Will be created if it doesn't exist.
 #' @param max_pages Maximum number of pages to scrape per author. Default is 2000.
-#' @param embedding_model The OpenAI embedding model to use. Default is "text-embedding-ada-002".
+#' @param embedding_model The OpenAI embedding model to use. Default is "text-embedding-3-small".
 #' @param prompt_model The LLM model to use for generating the scholar instructions.
-#'   Default is "google/gemini-2.0-flash-001".
+#'   Default is "anthropic/claude-sonnet-4".
 #' @param progress Whether to display progress information. Default is TRUE.
 #'
 #' @return Invisibly returns a list with paths to all created artifacts.
 #' @export
 build_ai_scholar <- function(
   authors,
-  output_dir,
+  output_dir = "corpus",
   max_pages = 2000,
-  embedding_model = "text-embedding-ada-002",
-  prompt_model = "google/gemini-2.0-flash-001",
+  embedding_model = "text-embedding-3-small",
+  prompt_model = "anthropic/claude-sonnet-4",
   progress = TRUE
 ) {
   # Input validation
