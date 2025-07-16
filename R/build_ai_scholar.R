@@ -1,5 +1,5 @@
 #' Build a complete AI scholar model
-#' 
+#'
 #' This function ties together all the steps required to build an AI scholar
 #' model, from scraping articles to generating the final prompt.
 #'
@@ -30,12 +30,12 @@ build_ai_scholar <- function(
   if (missing(output_dir)) {
     stop("Output directory must be provided")
   }
-  
+
   # Ensure output directory exists
   if (!dir.exists(output_dir)) {
     dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   }
-  
+
   # Step 1: Scrape AEI articles
   if (progress) cli::cli_h1("Step 1: Scraping AEI articles")
   scrape_results <- scrape_aei(
@@ -44,19 +44,19 @@ build_ai_scholar <- function(
     max_pages = max_pages,
     progress = progress
   )
-  
+
   # Step 2: Convert corpus to dataframe
   if (progress) cli::cli_h1("Step 2: Converting corpus to dataframe")
   corpus_df <- text_corpus_to_df(output_dir)
-  
+
   # Step 3: Save corpus metadata
   if (progress) cli::cli_h1("Step 3: Saving corpus metadata")
   metadata_path <- save_corpus_metadata(output_dir)
-  
+
   # Step 4: Convert corpus to DuckDB
   if (progress) cli::cli_h1("Step 4: Converting corpus to DuckDB")
   db_path <- corpus_to_duckdb(corpus_dir = output_dir)
-  
+
   # Step 5: Generate corpus embeddings
   if (progress) cli::cli_h1("Step 5: Generating corpus embeddings")
   corpus_embeddings(
@@ -64,15 +64,16 @@ build_ai_scholar <- function(
     model = embedding_model,
     progress = progress
   )
-  
+
   # Step 6: Build scholar prompt
   if (progress) cli::cli_h1("Step 6: Building scholar prompt")
   prompt_path <- build_scholar_prompt(
     corpus_path = output_dir,
+    authors = authors,
     model = prompt_model,
     output_path = file.path(output_dir, "scholar_instructions.md")
   )
-  
+
   # Print summary if progress is enabled
   if (progress) {
     cli::cli_h1("AI Scholar build completed successfully")
@@ -82,7 +83,7 @@ build_ai_scholar <- function(
     cli::cli_alert_success("Scholar prompt: {.path {prompt_path}}")
     cli::cli_alert_success("Articles scraped: {nrow(scrape_results)}")
   }
-  
+
   # Return paths to artifacts invisibly
   invisible(list(
     output_dir = output_dir,

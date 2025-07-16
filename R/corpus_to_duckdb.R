@@ -243,9 +243,8 @@ read_and_clean_text <- function(file_path) {
   # Normalize consecutive whitespace (but preserve single spaces)
   text_content <- gsub("[ \t]{2,}", " ", text_content)
 
-  # Only remove null bytes and truly problematic control characters
-  # This preserves all normal text characters
-  text_content <- gsub("\uFFFD|<U\\+FFFD>", "", text_content)
+  # Remove null bytes and truly problematic control characters
+  text_content <- gsub("\uFFFD|<U\\+FFFD>|<U\\+F0B7>", "", text_content)
 
   # Normalize line endings to \n
   text_content <- gsub("\\r\\n|\\r", "\\n", text_content)

@@ -72,12 +72,12 @@ test_that("Corpus embeddings can be generated", {
   expect_gt(embedding_count, 0, "No embeddings were generated")
 
   # Test similarity search
-  query <- "economic policy"
+  query <- "how can we solve the housing crisis with light-touch density"
   message("Testing similarity search with query: '", query, "'")
-  query_embedding <- scholarAI::get_text_embedding(query)
+
   similar_docs <- scholarAI::find_similar_documents(
     embeddings_con,
-    query_embedding,
+    query,
     limit = 3
   )
 
@@ -113,7 +113,7 @@ test_that("Scholar prompt can be built", {
   # Build the scholar prompt
   prompt_path <- scholarAI::build_scholar_prompt(
     corpus_path = out_dir,
-    model = "google/gemini-2.0-flash-001",
+    model = "google/gemini-2.5-flash",
     output_path = file.path(out_dir, "scholar_instructions.md")
   )
 

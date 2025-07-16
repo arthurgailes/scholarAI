@@ -6,6 +6,7 @@
 #' of instructions (max 1000 words) that captures the essence of the scholar.
 #'
 #' @param corpus_path Path to the corpus directory or DuckDB database
+#' @param A character vector. If NULL (default), authors will be inferred.
 #' @param output_path Path where the markdown instructions file will be saved
 #' @param model_name Name of the AI model to use (default: "google/gemini-2.5-pro")
 #' @param batch_size Number of documents to process in each batch (default: 10)
@@ -23,6 +24,7 @@
 #' @export
 build_scholar_prompt <- function(
   corpus_path,
+  authors = NULL,
   output_path = "scholar_instructions.md",
   model_name = "google/gemini-2.5-pro",
   batch_size = 10,
@@ -57,6 +59,7 @@ build_scholar_prompt <- function(
   # Process corpus in batches
   instructions <- process_corpus_in_batches(
     corpus_data,
+    authors = authors,
     batch_size,
     max_token_per_batch,
     model_name,
@@ -138,6 +141,7 @@ load_corpus_data <- function(corpus_path, is_duckdb) {
 #' @keywords internal
 process_corpus_in_batches <- function(
   corpus_data,
+  authors,
   batch_size,
   max_token_per_batch,
   model_name,
@@ -209,6 +213,7 @@ process_corpus_in_batches <- function(
 
   # Final refinement to ensure instructions are concise (<=1000 words)
   instructions <- finalize_instructions(
+    authors = authors,
     instructions,
     model_name,
     api_key,
@@ -283,31 +288,26 @@ update_instructions <- function(
 
 #' Finalize instructions to ensure they are concise and clear
 #' @keywords internal
-finalize_instructions <- function(instructions, model_name, api_key, verbose) {
+finalize_instructions <- function(authors, instructions,  model_name, api_key, verbose) {
   if (verbose) {
     cli::cli_alert_info("Finalizing scholar instructions")
   }
 
+  if(is.null(authors)) authors <- "the primary author(s)"
+  if(length(authors) > 1) authors <- paste(authors, collapse = ",")
+
   # Count words in current instructions
   word_count <- length(strsplit(instructions, "\\s+")[[1]])
 
-  # If already under 1000 words, just do a final polish
-  if (word_count <= 1000) {
-    prompt <- paste0(
-      "Polish the following instructions for replicating a scholar's writing style. ",
-      "Ensure they are clear, concise, and well-organized while maintaining all key insights. ",
+  # Do a final polish
+    prompt <- paste(
+      "Polish the following instructions for replicating the writing style of",
+      authors,
+      ". Ensure they are clear, concise, and well-organized while maintaining all key insights.",
       "Keep the total length under 1000 words.\n\n",
       instructions
-    )
-  } else {
-    # Need to condense
-    prompt <- paste0(
-      "The following instructions for replicating a scholar's writing style are too long. ",
-      "Condense them to under 1000 words while preserving all key insights about the scholar's ",
-      "voice, style, topics, and unique characteristics.\n\n",
-      instructions
-    )
-  }
+  )
+
 
   # Call AI model for final refinement
   response <- call_ai_model(prompt, model_name, api_key, verbose)
