@@ -45,7 +45,7 @@ build_ai_scholar <- function(
     authors = authors,
     progress = progress
   )
-  
+
   # Step 1: Scrape AEI articles
   if (progress) cli::cli_h1("Step 1: Scraping AEI articles")
   scrape_results <- scrape_aei(
@@ -83,10 +83,10 @@ build_ai_scholar <- function(
     model = prompt_model,
     output_path = file.path(output_dir, "scholar_instructions.md")
   )
-  
+
   # Step 7: Generating scholar-specific functions
   if (progress) cli::cli_h1("Step 7: Generating scholar-specific functions")
-  
+
   # Update the configuration with the latest paths
   save_scholar_config(
     output_dir = output_dir,
@@ -95,7 +95,7 @@ build_ai_scholar <- function(
     config_path = config_path,
     progress = progress
   )
-  
+
   # Generate scholar-specific functions and create custom.R file
   scholar_result <- generate_scholar_functions(
     authors = authors,
@@ -107,7 +107,7 @@ build_ai_scholar <- function(
     custom_file = custom_file,
     progress = progress
   )
-  
+
   # Extract results
   custom_file <- scholar_result$custom_file
   scholar_functions <- scholar_result$scholar_functions

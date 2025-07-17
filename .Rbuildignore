@@ -4,4 +4,4 @@
 ^.workplan
 ^exploration
 ^conda_env
-^tests/testthat/test_data
+^tests/testthat/test_data/
