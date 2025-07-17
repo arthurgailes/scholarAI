@@ -26,13 +26,13 @@ ask_scholar <- function(
   progress = TRUE
 ) {
   # Input validation
-  if (missing(query) || !is.character(query) || length(query) != 1) {
+  if (!is.character(query) || length(query) != 1) {
     stop("Query must be a single character string")
   }
-  if (missing(db_path) || !file.exists(db_path)) {
+  if (!file.exists(db_path)) {
     stop("Database path must be provided and exist")
   }
-  
+
   # If prompt_path is NULL, try to infer it from the db_path
   if (is.null(prompt_path)) {
     corpus_dir <- dirname(db_path)
@@ -48,77 +48,94 @@ ask_scholar <- function(
   } else if (!file.exists(prompt_path)) {
     stop("Provided prompt path does not exist")
   }
-  
+
   # Connect to the database
   if (progress) cli::cli_alert_info("Connecting to database")
   con <- DBI::dbConnect(duckdb::duckdb(), db_path, array = "matrix")
   on.exit(DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
-  
+
   # Find similar documents
   if (progress) cli::cli_alert_info("Finding relevant documents for query")
   similar_docs <- find_similar_documents(con, query, limit = limit)
-  
+
   if (nrow(similar_docs) == 0) {
     stop("No relevant documents found for the query")
   }
-  
+
   # Read the scholar instructions
   if (progress) cli::cli_alert_info("Reading scholar instructions")
   instructions <- readLines(prompt_path, warn = FALSE)
   instructions <- paste(instructions, collapse = "\n")
-  
+
   # Prepare context from similar documents
-  if (progress) cli::cli_alert_info("Preparing context from {nrow(similar_docs)} documents")
+  if (progress)
+    cli::cli_alert_info("Preparing context from {nrow(similar_docs)} documents")
   context <- paste(
     sapply(seq_len(nrow(similar_docs)), function(i) {
       doc <- similar_docs[i, ]
       paste0(
-        "Document ", i, ":\n",
-        "Title: ", doc$title, "\n",
-        "URL: ", doc$url, "\n",
-        "Content:\n", doc$content, "\n\n"
+        "Document ",
+        i,
+        ":\n",
+        "Title: ",
+        doc$title,
+        "\n",
+        "URL: ",
+        doc$url,
+        "\n",
+        "Content:\n",
+        doc$content,
+        "\n\n"
       )
     }),
     collapse = "\n"
   )
-  
+
   # Construct the prompt
   if (progress) cli::cli_alert_info("Constructing prompt")
   prompt <- paste0(
-    instructions, "\n\n",
-    "CONTEXT:\n", context, "\n\n",
-    "USER QUERY: ", query, "\n\n",
+    instructions,
+    "\n\n",
+    "CONTEXT:\n",
+    context,
+    "\n\n",
+    "USER QUERY: ",
+    query,
+    "\n\n",
     "Please respond to this query as the scholar, based on the provided context."
   )
-  
+
   # Generate the response using ellmer package
   if (progress) cli::cli_alert_info("Generating response using {model}")
-  
+
   # Set up chat arguments
   chat_args <- list(
     model = model,
     system_prompt = "You are an AI scholar responding to queries based on provided context.",
     api_args = list(temperature = temperature)
   )
-  
+
   # Create chat instance and generate response
-  tryCatch({
-    # Use the specified chat function
-    chat_fn_name <- paste0("ellmer::chat_", chat_function)
-    
-    # Create chat instance
-    chat <- do.call(chat_fn_name, chat_args)
-    
-    # Generate response
-    response <- chat$chat(prompt)
-    
-    if (progress) cli::cli_alert_success("Response generated successfully")
-    return(response)
-  }, error = function(e) {
-    cli::cli_abort(c(
-      "x" = "Error generating response.",
-      "i" = paste0("Error message: ", e$message),
-      "i" = "Check your API key and model name."
-    ))
-  })
+  tryCatch(
+    {
+      # Use the specified chat function
+      chat_fn_name <- paste0("ellmer::chat_", chat_function)
+
+      # Create chat instance
+      chat <- do.call(chat_fn_name, chat_args)
+
+      # Generate response
+      response <- chat$chat(prompt)
+
+      if (progress) cli::cli_alert_success("Response generated successfully")
+      return(response)
+    },
+    error = function(e) {
+      cli::cli_abort(c(
+        "x" = "Error generating response.",
+        "i" = paste0("Error message: ", e$message),
+        "i" = "Check your API key and model name."
+      ))
+    }
+  )
 }
