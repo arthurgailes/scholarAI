@@ -79,7 +79,7 @@ generate_scholar_functions <- function(
   prompt_model = "anthropic/claude-sonnet-4",
   output_dir = NULL,
   config_path = "./scholarai_config.yml",
-  custom_file = NULL,
+  custom_file = "scholar_functions.R",
   progress = TRUE
 ) {
   # Try to load configuration if parameters are NULL
@@ -132,10 +132,6 @@ generate_scholar_functions <- function(
     }
   }
 
-  # Create custom.R file path if not provided
-  if (is.null(custom_file)) {
-    custom_file <- file.path(dirname(output_dir), "custom.R")
-  }
   if (progress)
     cli::cli_alert_info("Creating custom.R file at {.path {custom_file}}")
 

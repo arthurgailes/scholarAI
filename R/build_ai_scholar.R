@@ -23,7 +23,7 @@ build_ai_scholar <- function(
   embedding_model = "text-embedding-3-small",
   prompt_model = "anthropic/claude-sonnet-4",
   progress = TRUE,
-  custom_file = NULL
+  custom_file = "scholar_functions.R"
 ) {
   # Input validation
   if (length(authors) == 0) {
