@@ -185,6 +185,8 @@ scrape_aei <- function(
       greenlist
     )
   }
+
+  if(length(meta_list) == 0) stop("Author not found")
   meta_df <- collapse::rowbind(meta_list)
   link_df <- cbind(link_df, meta_df)
 

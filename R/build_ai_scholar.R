@@ -26,9 +26,6 @@ build_ai_scholar <- function(
   custom_file = "scholar_functions.R"
 ) {
   # Input validation
-  if (missing(output_dir) || is.null(output_dir) || !nzchar(output_dir)) {
-    stop("An output directory must be provided.")
-  }
   if (length(authors) == 0) {
     stop("At least one author must be provided")
   }
