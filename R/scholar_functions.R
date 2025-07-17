@@ -34,7 +34,7 @@ generate_scholar_function <- function(
   # Extract first name from scholar_name
   first_name <- strsplit(scholar_name, " ")[[1]][1]
   fn <- function(query, limit = 5, temperature = 0.7, progress = TRUE) {
-    scholarAI::ask_scholar(
+    ask_scholar(
       query = query,
       db_path = db_path,
       prompt_path = prompt_path,
@@ -190,7 +190,7 @@ generate_scholar_functions <- function(
         function_name,
         " <- function(query, limit = 5, temperature = 0.7, progress = TRUE) {"
       ),
-      "  scholarAI::ask_scholar(",
+      "  ask_scholar(",
       paste0("    query = query,"),
       paste0("    db_path = \"", db_path, "\","),
       paste0("    prompt_path = \"", prompt_path, "\","),

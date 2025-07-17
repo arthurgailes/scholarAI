@@ -10,17 +10,34 @@ extract_metadata <- function(article_html) {
     xpath = "//*[self::h1 or self::h2 or self::h3]"
   )
   title_texts <- rvest::html_text(title_elements, trim = TRUE)
-  title <- scholarAI::first_or(title_texts, "No Title Found")
+  title <- first_or(title_texts, "No Title Found")
 
   # Try to find date
   time_tags <- rvest::html_elements(article_html, xpath = "//time")
   date_texts <- as.character(rvest::html_text(time_tags, trim = TRUE))
-  date_matches <- date_texts[!is.na(date_texts) & vapply(date_texts, function(x) grepl(scholarAI::date_patterns(), x), logical(1))]
+  date_matches <- date_texts[
+    !is.na(date_texts) &
+      vapply(
+        date_texts,
+        function(x) grepl(date_patterns(), x),
+        logical(1)
+      )
+  ]
   if (length(date_matches) == 0) {
     # Fallback: all tags, pick the shortest match
-    possible_tags <- rvest::html_elements(article_html, xpath = "//p|//span|//div")
+    possible_tags <- rvest::html_elements(
+      article_html,
+      xpath = "//p|//span|//div"
+    )
     date_texts <- as.character(rvest::html_text(possible_tags, trim = TRUE))
-    date_matches <- date_texts[!is.na(date_texts) & vapply(date_texts, function(x) grepl(scholarAI::date_patterns(), x), logical(1))]
+    date_matches <- date_texts[
+      !is.na(date_texts) &
+        vapply(
+          date_texts,
+          function(x) grepl(date_patterns(), x),
+          logical(1)
+        )
+    ]
     if (length(date_matches) > 0) {
       date <- date_matches[[which.min(nchar(date_matches))]]
     } else {
@@ -36,7 +53,7 @@ extract_metadata <- function(article_html) {
     xpath = "//*[contains(@class,'author')]"
   )
   author_texts <- rvest::html_text(author_elements, trim = TRUE)
-  author <- scholarAI::first_or(author_texts, "No Author Found")
+  author <- first_or(author_texts, "No Author Found")
   # Clean up author text
   author <- gsub("^(By|With) ", "", author)
   author <- gsub("\\|", ", ", author)
@@ -97,7 +114,7 @@ handle_pdfs <- function(article_html, base_url, folder_path, greenlist) {
           pdf_url <- xml2::url_absolute(src, base_url)
           if (!(pdf_url %in% downloaded_urls)) {
             pdf_path <- file.path(folder_path, paste0(n, ".pdf"))
-            if (isTRUE(scholarAI::save_pdf(pdf_url, pdf_path))) {
+            if (isTRUE(save_pdf(pdf_url, pdf_path))) {
               message("Saved PDF from iframe: ", basename(pdf_path))
               downloaded_urls <- c(downloaded_urls, pdf_url)
               n <- n + 1L
@@ -112,7 +129,7 @@ handle_pdfs <- function(article_html, base_url, folder_path, greenlist) {
           pdf_url <- xml2::url_absolute(data_src, base_url)
           if (!(pdf_url %in% downloaded_urls)) {
             pdf_path <- file.path(folder_path, paste0(n, ".pdf"))
-            if (isTRUE(scholarAI::save_pdf(pdf_url, pdf_path))) {
+            if (isTRUE(save_pdf(pdf_url, pdf_path))) {
               message("Saved PDF from iframe data-src: ", basename(pdf_path))
               downloaded_urls <- c(downloaded_urls, pdf_url)
               n <- n + 1L
@@ -142,7 +159,7 @@ handle_pdfs <- function(article_html, base_url, folder_path, greenlist) {
         if (!is.null(pdf_param) && !(pdf_param %in% downloaded_urls)) {
           actual_pdf_url <- xml2::url_absolute(pdf_param, base_url)
           pdf_path <- file.path(folder_path, paste0(n, ".pdf"))
-          if (scholarAI::save_pdf(actual_pdf_url, pdf_path)) {
+          if (save_pdf(actual_pdf_url, pdf_path)) {
             message("Saved PDF from viewer: ", basename(pdf_path))
             downloaded_urls <- c(downloaded_urls, actual_pdf_url)
             n <- n + 1L
@@ -163,7 +180,7 @@ handle_pdfs <- function(article_html, base_url, folder_path, greenlist) {
       pdf_url <- xml2::url_absolute(href, base_url)
       if (!(pdf_url %in% downloaded_urls)) {
         pdf_path <- file.path(folder_path, paste0(n, ".pdf"))
-        if (isTRUE(scholarAI::save_pdf(pdf_url, pdf_path))) {
+        if (isTRUE(save_pdf(pdf_url, pdf_path))) {
           message("Saved PDF from link: ", basename(pdf_path))
           downloaded_urls <- c(downloaded_urls, pdf_url)
           n <- n + 1L
@@ -185,7 +202,7 @@ extract_and_save <- function(
   output_root = "data/intermed/aei_search_results",
   greenlist = "https://www.aei.org/housing-supply-case-studies/"
 ) {
-  page_name <- scholarAI::create_folder_name(url)
+  page_name <- create_folder_name(url)
   folder_path <- file.path(output_root, page_name)
   dir.create(folder_path, recursive = TRUE, showWarnings = FALSE)
 
@@ -207,10 +224,10 @@ extract_and_save <- function(
   main_article <- rvest::html_element(main_element, "article")
   if (is.na(main_article)) main_article <- html
 
-  text <- scholarAI::extract_text(main_article)
+  text <- extract_text(main_article)
   writeLines(text, file.path(folder_path, "article_text.txt"), useBytes = TRUE)
-  pdf_saved <- scholarAI::handle_pdfs(main_article, url, folder_path, greenlist)
-  meta <- scholarAI::extract_metadata(main_article)
+  pdf_saved <- handle_pdfs(main_article, url, folder_path, greenlist)
+  meta <- extract_metadata(main_article)
 
   pdf_files <- list.files(folder_path, pattern = "\\.pdf$", full.names = TRUE)
   pdf_text <- ""

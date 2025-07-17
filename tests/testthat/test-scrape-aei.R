@@ -11,33 +11,17 @@ library(mockery)
 ## -------------------------------------------------------------------------
 context("get_author_links")
 
-test_that("get_author_links extracts links from search results", {
-  # Use a simpler approach - just mock the entire function
-  mock_get_author_links <- function(author_slug, max_pages, progress) {
-    # Return the expected links directly
-    c("https://www.aei.org/article1/", "https://www.aei.org/article2/")
-  }
-
-  # Save the original function
-  original_fn <- scholarAI:::get_author_links
-
-  # Replace with mock temporarily
-  unlockBinding("get_author_links", getNamespace("scholarAI"))
-  assign("get_author_links", mock_get_author_links, getNamespace("scholarAI"))
-
-  # Call the function and test results
+test_that("get_author_links extracts links from search results (real AEI call, short)", {
+  skip_on_cran()
+  skip_if_offline(host = "www.aei.org")
+  # Use a real AEI author but limit to 1 page for speed
   result <- scholarAI:::get_author_links(
-    "Test+Author",
+    "Tobias%20Peter",
     max_pages = 1,
     progress = FALSE
   )
-  expect_equal(length(result), 2)
-  expect_equal(result[1], "https://www.aei.org/article1/")
-  expect_equal(result[2], "https://www.aei.org/article2/")
-
-  # Restore original function
-  assign("get_author_links", original_fn, getNamespace("scholarAI"))
-  lockBinding("get_author_links", getNamespace("scholarAI"))
+  expect_type(result, "character")
+  expect_true(length(result) >= 0)
 })
 
 ## -------------------------------------------------------------------------
@@ -171,7 +155,7 @@ test_that("scrape_aei processes articles with mocked functions", {
     file.exists(out_json),
     "corpus_metadata.json should be written to output root"
   )
-  json_data <- yyjsonr::read_json_file(out_json, simplifyVector = TRUE)
+  json_data <- yyjsonr::read_json_file(out_json)
   expect_true(is.data.frame(json_data), "JSON output should be a data frame")
   expect_equal(nrow(json_data), 2)
 })

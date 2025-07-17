@@ -133,18 +133,23 @@ copy_pdfs <- function(
 #' @param authors Character vector of author names.
 #' @param output_root Directory where intermediate results live.
 #' @param greenlist Character vector of URL prefixes that require extra PDF search.
+#' @param max_pages Integer. Maximum number of pages to scrape per author (default 2000).
 #' @export
 scrape_aei <- function(
   authors = c("Edward J. Pinto", "Tobias Peter"),
   output_root = "data/intermed/aei_search_results",
-  greenlist = "https://www.aei.org/housing-supply-case-studies/"
+  greenlist = "https://www.aei.org/housing-supply-case-studies/",
+  max_pages = 2000
 ) {
   dir.create(output_root, recursive = TRUE, showWarnings = FALSE)
 
   authors <- gsub(" ", "%20", authors)
 
   message("Discovering article links …")
-  link_vec <- unlist(lapply(authors, scholarAI::get_author_links))
+  link_vec <- unlist(lapply(
+    authors,
+    function(a) get_author_links(a, max_pages = max_pages)
+  ))
   link_vec <- unique(link_vec)
 
   link_vec <- link_vec[
@@ -159,7 +164,7 @@ scrape_aei <- function(
     url = link_vec,
     folder_name = sapply(
       link_vec,
-      scholarAI::create_folder_name,
+      create_folder_name,
       USE.NAMES = FALSE
     )
   )
@@ -174,7 +179,7 @@ scrape_aei <- function(
   meta_list <- vector("list", nrow(link_df))
   for (i in seq_len(nrow(link_df))) {
     pb$tick()
-    meta_list[[i]] <- scholarAI::extract_and_save(
+    meta_list[[i]] <- extract_and_save(
       link_df$url[i],
       output_root,
       greenlist
@@ -189,7 +194,7 @@ scrape_aei <- function(
     row.names = FALSE
   )
 
-  scholarAI::copy_pdfs(output_root)
+  copy_pdfs(output_root)
 
   invisible(link_df)
 }

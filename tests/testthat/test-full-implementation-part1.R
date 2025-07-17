@@ -71,34 +71,12 @@ test_that("Configuration can be saved", {
 # Using Tobias Peter as the test author, limiting to 2 pages for reasonable test time
 message("STEP 1: Scraping AEI articles")
 
-# Create a wrapper that limits to 2 pages
-original_get_links <- scholarAI:::get_author_links
-limited_get_links <- function(
-  author_slug,
-  max_pages = 2000,
-  progress = TRUE
-) {
-  # Call the original but limit to 2 pages
-  original_get_links(author_slug, max_pages = 2, progress = FALSE)
-}
-
-# Replace with limited version temporarily
-unlockBinding("get_author_links", getNamespace("scholarAI"))
-assign("get_author_links", limited_get_links, getNamespace("scholarAI"))
 
 # Run the scraper with real web requests
-scrape_results <- tryCatch(
-  {
-    scholarAI::scrape_aei(
-      authors = "Tobias%20Peter",
-      output_root = out_dir
-    )
-  },
-  finally = {
-    # Restore original function
-    assign("get_author_links", original_get_links, getNamespace("scholarAI"))
-    lockBinding("get_author_links", getNamespace("scholarAI"))
-  }
+scrape_results <- scholarAI::scrape_aei(
+  authors = "Tobias%20Peter",
+  output_root = out_dir,
+  max_pages = 2
 )
 
 # Print scrape results summary
