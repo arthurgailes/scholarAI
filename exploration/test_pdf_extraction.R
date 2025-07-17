@@ -27,32 +27,27 @@ if (length(pdf_files) > 0) {
   print(file.size(pdf_files))
 } else {
   cat("No PDF files found in", folder_path, "\n")
-  
-  # Debug: Check what HTML we're working with
-  cat("\nChecking HTML structure...\n")
-  res <- httr::GET(test_url, httr::config(ssl_verifypeer = FALSE), httr::timeout(20))
-  html <- xml2::read_html(res)
-  
+
   # Find main article element
   main_element <- rvest::html_element(html, "main")
   main_article <- rvest::html_element(main_element, "article")
   if (is.na(main_article)) main_article <- html
-  
+
   # Check for iframes
   iframe_elements <- rvest::html_elements(main_article, "iframe")
   cat("Number of iframes found:", length(iframe_elements), "\n")
-  
+
   if (length(iframe_elements) > 0) {
     iframe_srcs <- rvest::html_attr(iframe_elements, "src")
     cat("iframe sources:\n")
     print(iframe_srcs)
   }
-  
+
   # Check for PDF links
   a_elements <- rvest::html_elements(main_article, "a")
   a_hrefs <- rvest::html_attr(a_elements, "href")
   pdf_hrefs <- a_hrefs[grepl("\\.pdf$", a_hrefs, ignore.case = TRUE)]
-  
+
   cat("Number of PDF links found:", length(pdf_hrefs), "\n")
   if (length(pdf_hrefs) > 0) {
     cat("PDF links:\n")

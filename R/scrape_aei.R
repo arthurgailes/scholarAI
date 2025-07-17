@@ -51,7 +51,7 @@ get_author_links <- function(author_slug, max_pages = 2000, progress = TRUE) {
       httr::GET(
         page_url,
         httr::config(ssl_verifypeer = FALSE),
-        httr::timeout(20)
+        httr::timeout(5)
       ),
       error = function(e) NULL
     )

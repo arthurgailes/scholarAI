@@ -21,7 +21,7 @@ get_openai_embeddings <- function(
   openai_key = Sys.getenv("OPENAI_API_KEY"),
   max_attempts = 3,
   pause_sec = 0.1,
-  timeout_sec = 5
+  timeout_sec = 2
 ) {
   check_embedding_input(texts, openai_key, max_attempts, pause_sec, timeout_sec)
 
@@ -30,7 +30,14 @@ get_openai_embeddings <- function(
   }
 
   results <- lapply(texts, function(txt) {
-    get_single_embedding(txt, model, openai_key, max_attempts, pause_sec, timeout_sec)
+    get_single_embedding(
+      txt,
+      model,
+      openai_key,
+      max_attempts,
+      pause_sec,
+      timeout_sec
+    )
   })
 
   emb_dim <- max(vapply(
@@ -56,16 +63,16 @@ get_single_embedding <- function(
   openai_key = Sys.getenv("OPENAI_API_KEY"),
   max_attempts = 3,
   pause_sec = 0.1,
-  timeout_sec = 5
+  timeout_sec = 2
 ) {
   if (is.na(txt) || txt == "") {
     cli::cli_warn("Empty or NA text provided to get_single_embedding")
     return(NA)
   }
-  
+
   # Truncate very long text for warning messages (used in error messages below)
   display_txt <- if (nchar(txt) > 50) paste0(substr(txt, 1, 50), "...") else txt
-  
+
   attempt <- 1
   repeat {
     resp <- tryCatch(
@@ -87,7 +94,7 @@ get_single_embedding <- function(
         return(e)
       }
     )
-    
+
     # Check if response is an error object
     if (inherits(resp, "error")) {
       if (attempt >= max_attempts) {
@@ -97,9 +104,7 @@ get_single_embedding <- function(
         ))
         return(NA)
       }
-    } 
-    # Check if response is a valid HTTP response
-    else if (inherits(resp, "response")) {
+    } else if (inherits(resp, "response")) { # Check if response is a valid HTTP response
       if (httr::status_code(resp) == 200) {
         # Success case
         content <- tryCatch(
@@ -112,9 +117,13 @@ get_single_embedding <- function(
             return(NULL)
           }
         )
-        
-        if (!is.null(content) && !is.null(content$data) && 
-            length(content$data) > 0 && !is.null(content$data[[1]]$embedding)) {
+
+        if (
+          !is.null(content) &&
+            !is.null(content$data) &&
+            length(content$data) > 0 &&
+            !is.null(content$data[[1]]$embedding)
+        ) {
           return(as.numeric(content$data[[1]]$embedding))
         } else {
           cli::cli_warn(c(
@@ -131,7 +140,7 @@ get_single_embedding <- function(
         } else {
           "Unknown error"
         }
-        
+
         # Use the variables in the warning message to avoid lint warnings
         cli::cli_warn(c(
           "!" = "API returned status code {status_code}",
@@ -140,7 +149,7 @@ get_single_embedding <- function(
         ))
       }
     }
-    
+
     if (attempt >= max_attempts) {
       display_txt <- substr(txt, 1, 50)
       if (nchar(txt) > 50) display_txt <- paste0(display_txt, "...")
@@ -150,13 +159,19 @@ get_single_embedding <- function(
       ))
       return(rep(NA_real_, 1536))
     }
-    
+
     attempt <- attempt + 1
     Sys.sleep(pause_sec)
   }
 }
 
-check_embedding_input <- function(texts, openai_key, max_attempts, pause_sec, timeout_sec) {
+check_embedding_input <- function(
+  texts,
+  openai_key,
+  max_attempts,
+  pause_sec,
+  timeout_sec
+) {
   if (!is.character(texts)) {
     cli::cli_abort(
       c(
@@ -170,5 +185,6 @@ check_embedding_input <- function(texts, openai_key, max_attempts, pause_sec, ti
   if (!is.numeric(max_attempts) || max_attempts < 1)
     stop("max_attempts must be >= 1")
   if (!is.numeric(pause_sec) || pause_sec < 0) stop("pause_sec must be >= 0")
-  if (!is.numeric(timeout_sec) || timeout_sec <= 0) stop("timeout_sec must be > 0")
+  if (!is.numeric(timeout_sec) || timeout_sec <= 0)
+    stop("timeout_sec must be > 0")
 }

@@ -26,7 +26,7 @@ test_that("handle_pdfs extracts PDFs from iframes", {
   res <- httr::GET(
     report_url,
     httr::config(ssl_verifypeer = FALSE),
-    httr::timeout(20)
+    httr::timeout(5)
   )
   expect_equal(
     httr::status_code(res),
