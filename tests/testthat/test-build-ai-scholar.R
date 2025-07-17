@@ -71,4 +71,4 @@ test_that("build_ai_scholar validates inputs", {
   ))
 })
 
-unlink("scholarai_config.yml")
+unlink(c("scholarai_config.yml", "corpus"), recursive = TRUE)
