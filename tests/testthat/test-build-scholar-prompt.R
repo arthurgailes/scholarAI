@@ -32,8 +32,10 @@ test_that("build_scholar_prompt creates markdown instructions from corpus", {
   output_path <- file.path(temp_dir, "instructions.md")
 
   # Mock the call_ai_model function to avoid actual API calls
-  mock_call_ai_model <- function(prompt, model_name, api_key, verbose) {
-    return("# Scholar Style Guide\n\nThis scholar writes in a formal, data-driven style with the following characteristics:\n\n- Relies heavily on statistical evidence\n- Uses phrases like 'the data suggests' and 'evidence indicates'\n- Focuses on economic policy and housing markets\n- Makes references to historical precedents\n- Presents arguments for fiscal restraint and zoning reform")
+  mock_call_ai_model <- function(prompt, model_name, api_key, progress) {
+    return(
+      "# Scholar Style Guide\n\nThis scholar writes in a formal, data-driven style with the following characteristics:\n\n- Relies heavily on statistical evidence\n- Uses phrases like 'the data suggests' and 'evidence indicates'\n- Focuses on economic policy and housing markets\n- Makes references to historical precedents\n- Presents arguments for fiscal restraint and zoning reform"
+    )
   }
 
   # Save original function and replace with mock
@@ -48,7 +50,7 @@ test_that("build_scholar_prompt creates markdown instructions from corpus", {
     corpus_path = temp_dir,
     output_path = output_path,
     batch_size = 1,
-    verbose = FALSE
+    progress = FALSE
   )
 
   # Restore original function
@@ -65,7 +67,6 @@ test_that("build_scholar_prompt creates markdown instructions from corpus", {
 })
 
 test_that("build_scholar_prompt handles DuckDB input", {
-
   # Create temp directory for test
   temp_dir <- tempfile("prompt_test_db_")
   dir.create(temp_dir)
@@ -92,8 +93,10 @@ test_that("build_scholar_prompt handles DuckDB input", {
   output_path <- file.path(temp_dir, "instructions.md")
 
   # Mock the call_ai_model function to avoid actual API calls
-  mock_call_ai_model <- function(prompt, model_name, api_key, verbose) {
-    return("# Scholar Style Guide\n\nThis scholar writes in a formal style with the following characteristics:\n\n- Focuses on economic policy and housing markets\n- Uses statistical evidence")
+  mock_call_ai_model <- function(prompt, model_name, api_key, progress) {
+    return(
+      "# Scholar Style Guide\n\nThis scholar writes in a formal style with the following characteristics:\n\n- Focuses on economic policy and housing markets\n- Uses statistical evidence"
+    )
   }
 
   # Save original function and replace with mock
@@ -108,7 +111,7 @@ test_that("build_scholar_prompt handles DuckDB input", {
     corpus_path = db_path,
     output_path = output_path,
     batch_size = 1,
-    verbose = FALSE
+    progress = FALSE
   )
 
   # Restore original function
@@ -142,7 +145,7 @@ test_that("build_scholar_prompt handles empty corpus gracefully", {
     build_scholar_prompt(
       corpus_path = temp_dir,
       output_path = output_path,
-      verbose = FALSE
+      progress = FALSE
     ),
     "No text files found"
   )
@@ -163,7 +166,10 @@ test_that("build_scholar_prompt respects token limits", {
   dir.create(doc_dir)
 
   # Generate large text (approximately 10K tokens)
-  large_text <- paste(rep("This is a test sentence with about ten tokens. ", 1000), collapse = "")
+  large_text <- paste(
+    rep("This is a test sentence with about ten tokens. ", 1000),
+    collapse = ""
+  )
   writeLines(large_text, file.path(doc_dir, "text.txt"))
 
   # Create output path
@@ -171,7 +177,7 @@ test_that("build_scholar_prompt respects token limits", {
 
   # Mock the call_ai_model function to check if text was truncated
   truncation_detected <- FALSE
-  mock_call_ai_model <- function(prompt, model_name, api_key, verbose) {
+  mock_call_ai_model <- function(prompt, model_name, api_key, progress) {
     # Check if truncation message is in the prompt
     if (grepl("Content truncated due to length", prompt)) {
       truncation_detected <<- TRUE
@@ -190,8 +196,8 @@ test_that("build_scholar_prompt respects token limits", {
   result <- build_scholar_prompt(
     corpus_path = temp_dir,
     output_path = output_path,
-    max_token_per_batch = 1000,  # Small limit to force truncation
-    verbose = FALSE
+    max_token_per_batch = 1000, # Small limit to force truncation
+    progress = FALSE
   )
 
   # Restore original function
@@ -218,14 +224,17 @@ test_that("build_scholar_prompt handles custom model name", {
   # Create a simple text file
   doc_dir <- file.path(temp_dir, "doc")
   dir.create(doc_dir)
-  writeLines("Sample text for testing custom model.", file.path(doc_dir, "text.txt"))
+  writeLines(
+    "Sample text for testing custom model.",
+    file.path(doc_dir, "text.txt")
+  )
 
   # Create output path
   output_path <- file.path(temp_dir, "instructions.md")
 
   # Mock the call_ai_model function to check if custom model name is used
   model_name_used <- NULL
-  mock_call_ai_model <- function(prompt, model_name, api_key, verbose) {
+  mock_call_ai_model <- function(prompt, model_name, api_key, progress) {
     model_name_used <<- model_name
     return("# Scholar Style Guide\n\nCustom model analysis.")
   }
@@ -243,7 +252,7 @@ test_that("build_scholar_prompt handles custom model name", {
     corpus_path = temp_dir,
     output_path = output_path,
     model_name = custom_model,
-    verbose = FALSE
+    progress = FALSE
   )
 
   # Restore original function

@@ -39,8 +39,7 @@ build_ai_scholar <- function(
   if (progress) cli::cli_h1("Step 0: Saving configuration")
   config_path <- save_scholar_config(
     output_dir = output_dir,
-    authors = authors,
-    progress = progress
+    authors = authors
   )
 
   # Step 1: Scrape AEI articles
@@ -48,8 +47,7 @@ build_ai_scholar <- function(
   scrape_results <- scrape_aei(
     authors = authors,
     output_root = output_dir,
-    max_pages = max_pages,
-    progress = progress
+    max_pages = max_pages
   )
 
   # Step 2: Convert corpus to dataframe
@@ -68,8 +66,7 @@ build_ai_scholar <- function(
   if (progress) cli::cli_h1("Step 5: Generating corpus embeddings")
   corpus_embeddings(
     db_path = db_path,
-    model = embedding_model,
-    progress = progress
+    model = embedding_model
   )
 
   # Step 6: Build scholar prompt
@@ -101,8 +98,7 @@ build_ai_scholar <- function(
     prompt_model = prompt_model,
     output_dir = output_dir,
     config_path = config_path,
-    custom_file = custom_file,
-    progress = progress
+    custom_file = custom_file
   )
 
   # Extract results

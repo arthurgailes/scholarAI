@@ -12,7 +12,7 @@
 #' @param batch_size Number of documents to process in each batch (default: 10)
 #' @param max_token_per_batch Maximum number of tokens to include in each batch (default: 8000)
 #' @param api_key Optional API key for the model service
-#' @param verbose Whether to show progress information (default: TRUE)
+#' @param progress Whether to show progress information (default: TRUE)
 #'
 #' @return Invisibly returns the path to the created markdown file
 #'
@@ -30,7 +30,7 @@ build_scholar_prompt <- function(
   batch_size = 10,
   max_token_per_batch = 8000,
   api_key = NULL,
-  verbose = TRUE
+  progress = TRUE
 ) {
   # Check for required packages
   if (!requireNamespace("cli", quietly = TRUE)) {
@@ -46,7 +46,7 @@ build_scholar_prompt <- function(
   }
 
   # Initialize progress reporting
-  if (verbose) {
+  if (progress) {
     cli::cli_alert_info("Starting analysis of scholar corpus")
   }
 
@@ -64,13 +64,13 @@ build_scholar_prompt <- function(
     max_token_per_batch,
     model_name,
     api_key,
-    verbose
+    progress
   )
 
   # Write final instructions to file
   writeLines(instructions, output_path)
 
-  if (verbose) {
+  if (progress) {
     cli::cli_alert_success(
       "Scholar instructions written to {.file {output_path}}"
     )
@@ -146,14 +146,14 @@ process_corpus_in_batches <- function(
   max_token_per_batch,
   model_name,
   api_key,
-  verbose
+  progress
 ) {
   # Initialize instructions
   instructions <- ""
   total_docs <- nrow(corpus_data)
   batches <- ceiling(total_docs / batch_size)
 
-  if (verbose) {
+  if (progress) {
     cli::cli_alert_info(
       "Processing {total_docs} documents in {batches} batches"
     )
@@ -187,7 +187,7 @@ process_corpus_in_batches <- function(
     batch_data <- batch_data[!is.na(batch_data$content), ]
 
     if (nrow(batch_data) == 0) {
-      if (verbose) {
+      if (progress) {
         cli::cli_warn("Batch {i} contains no valid documents, skipping")
       }
       next
@@ -202,11 +202,11 @@ process_corpus_in_batches <- function(
       instructions,
       model_name,
       api_key,
-      verbose
+      progress
     )
 
     # Update progress
-    if (verbose) {
+    if (progress) {
       cli::cli_progress_update(set = i)
     }
   }
@@ -217,7 +217,7 @@ process_corpus_in_batches <- function(
     instructions,
     model_name,
     api_key,
-    verbose
+    progress
   )
 
   return(instructions)
@@ -253,7 +253,7 @@ update_instructions <- function(
   current_instructions,
   model_name,
   api_key,
-  verbose
+  progress
 ) {
   # First batch - generate initial instructions
   if (current_instructions == "") {
@@ -278,7 +278,7 @@ update_instructions <- function(
   }
 
   # Call AI model to generate/update instructions
-  response <- call_ai_model(prompt, model_name, api_key, verbose)
+  response <- call_ai_model(prompt, model_name, api_key, progress)
 
   # Extract markdown content from response
   new_instructions <- extract_markdown_content(response)
@@ -288,29 +288,34 @@ update_instructions <- function(
 
 #' Finalize instructions to ensure they are concise and clear
 #' @keywords internal
-finalize_instructions <- function(authors, instructions,  model_name, api_key, verbose) {
-  if (verbose) {
+finalize_instructions <- function(
+  authors,
+  instructions,
+  model_name,
+  api_key,
+  progress
+) {
+  if (progress) {
     cli::cli_alert_info("Finalizing scholar instructions")
   }
 
-  if(is.null(authors)) authors <- "the primary author(s)"
-  if(length(authors) > 1) authors <- paste(authors, collapse = ",")
+  if (is.null(authors)) authors <- "the primary author(s)"
+  if (length(authors) > 1) authors <- paste(authors, collapse = ",")
 
   # Count words in current instructions
   word_count <- length(strsplit(instructions, "\\s+")[[1]])
 
   # Do a final polish
-    prompt <- paste(
-      "Polish the following instructions for replicating the writing style of",
-      authors,
-      ". Ensure they are clear, concise, and well-organized while maintaining all key insights.",
-      "Keep the total length under 1000 words.\n\n",
-      instructions
+  prompt <- paste(
+    "Polish the following instructions for replicating the writing style of",
+    authors,
+    ". Ensure they are clear, concise, and well-organized while maintaining all key insights.",
+    "Keep the total length under 1000 words.\n\n",
+    instructions
   )
 
-
   # Call AI model for final refinement
-  response <- call_ai_model(prompt, model_name, api_key, verbose)
+  response <- call_ai_model(prompt, model_name, api_key, progress)
 
   # Extract markdown content
   final_instructions <- extract_markdown_content(response)
@@ -320,8 +325,8 @@ finalize_instructions <- function(authors, instructions,  model_name, api_key, v
 
 #' Call AI model with prompt
 #' @keywords internal
-call_ai_model <- function(prompt, model_name, api_key, verbose) {
-  if (verbose) {
+call_ai_model <- function(prompt, model_name, api_key, progress) {
+  if (progress) {
     cli::cli_alert_info("Calling AI model: {model_name}")
   }
 
