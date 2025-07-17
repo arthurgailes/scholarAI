@@ -44,16 +44,13 @@ if (!file.exists(config_path)) {
   )
 }
 
+openai_avail <- Sys.getenv("OPENAI_API_KEY") != ""
+openrouter_avail <- Sys.getenv("OPENROUTER_API_KEY") != ""
+
 
 test_that("env is ready", {
-  expect_true(
-    Sys.getenv("OPENAI_API_KEY") != "",
-    "OpenAI API key not available"
-  )
-  expect_true(
-    Sys.getenv("OPENROUTER_API_KEY") != "",
-    "OpenAI API key not available"
-  )
+  expect_true(openai_avail, "OpenAI API key not available")
+  expect_true(openrouter_avail, "OpenRouter API key not available")
 
   expect_true(file.exists(db_path), "Need to create db")
   expect_true(dir.exists(out_dir), "Need to create directory")
@@ -72,10 +69,7 @@ message("STEP 5: Generating corpus embeddings")
 # Generate embeddings and run tests in the same test block
 test_that("Corpus embeddings can be generated", {
   # Skip if OpenAI API key is not available
-  skip_if_not(
-    Sys.getenv("OPENAI_API_KEY") != "",
-    "OpenAI API key not available"
-  )
+  skip_if_not(openai_avail, "OpenAI API key not available")
 
   # This test depends on the successful creation of the database in part 1
   skip_if_not(
