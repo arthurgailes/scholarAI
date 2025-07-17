@@ -35,8 +35,8 @@ find_similar_documents <- function(
   query_embedding <- get_text_embedding(query)
 
   # Return early if no embeddings exist
-  if (embedding_count == 0) {
-    stop("No embeddings found in database")
+  if (length(query_embedding) == 0) {
+    stop("Unable to generate embeddings for query")
   }
 
   # Format query embedding as a string for DuckDB SQL
@@ -52,10 +52,14 @@ find_similar_documents <- function(
   # Try using VSS with HNSW index for fast similarity search
   sql_query <- paste(
     "SELECT c.*,",
-    "array_inner_product(embedding, ", query_embedding_str, ") AS similarity ",
+    "array_inner_product(embedding, ",
+    query_embedding_str,
+    ") AS similarity ",
     "FROM embeddings e JOIN corpus c ON e.id = c.id ",
-    "WHERE similarity >= ", min_similarity,
-    "ORDER BY similarity DESC LIMIT ", limit
+    "WHERE similarity >= ",
+    min_similarity,
+    "ORDER BY similarity DESC LIMIT ",
+    limit
   )
 
   cli::cli_alert_info(
@@ -84,5 +88,3 @@ find_similar_documents <- function(
 
   return(results)
 }
-
-

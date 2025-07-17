@@ -82,7 +82,7 @@ test_that("corpus_embeddings creates embeddings in DuckDB", {
 
   similar_docs <- scholarAI::find_similar_documents(
     con,
-    query_embedding,
+    query,
     limit = 3,
     min_similarity = 0.3
   )
