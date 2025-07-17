@@ -184,13 +184,17 @@ generate_scholar_functions <- function(
       custom_content,
       paste0(
         function_name,
-        " <- function(query, limit = 5, temperature = 0.7, progress = TRUE) {"
+        " <- function(query, model = \"",
+        prompt_model,
+        "\", db_path = \"",
+        here::here(db_path),
+        "\", limit = 5, temperature = 0.7, progress = TRUE) {"
       ),
       "  ask_scholar(",
       paste0("    query = query,"),
-      paste0("    db_path = \"", here::here(db_path), "\","),
+      paste0("    db_path = db_path,"),
       paste0("    prompt_path = \"", here::here(prompt_path), "\","),
-      paste0("    model = \"", prompt_model, "\","),
+      paste0("    model = model,"),
       "    limit = limit,",
       "    temperature = temperature,",
       "    progress = progress",

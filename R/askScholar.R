@@ -127,11 +127,8 @@ ask_scholar <- function(
       # Create chat instance
       chat <- do.call(chat_fn, chat_args)
 
-      # Generate response
-      response <- chat$chat(prompt)
-
       if (progress) cli::cli_alert_success("Response generated successfully")
-      return(response)
+      return(chat$chat(prompt))
     },
     error = function(e) {
       cli::cli_abort(c(
