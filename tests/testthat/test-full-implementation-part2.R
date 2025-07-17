@@ -21,7 +21,7 @@ db_path <- file.path(out_dir, "corpus.duckdb")
 metadata_path <- file.path(out_dir, "corpus_metadata.json")
 
 # Load configuration from part 1
-config_path <- file.path(out_dir, "scholarai_config.yml")
+
 
 # Define the prompt path
 prompt_path <- file.path(out_dir, "scholar_instructions.md")
@@ -30,16 +30,11 @@ prompt_path <- file.path(out_dir, "scholar_instructions.md")
 assign("embedding_count", 0, envir = .GlobalEnv)
 
 # Ensure the config file exists in the test directory
-if (!file.exists(config_path)) {
-  # Create the directory if it doesn't exist
-  dir.create(dirname(config_path), recursive = TRUE, showWarnings = FALSE)
-
-  # Create a configuration file
+if (!file.exists("./scholarai_config.yml")) {
   scholarAI::save_scholar_config(
     output_dir = out_dir,
     authors = "Tobias%20Peter",
     db_path = db_path,
-    config_path = config_path,
     progress = FALSE
   )
 }
@@ -164,34 +159,31 @@ test_that("Scholar functions can be generated", {
   skip_if_not_installed("yaml")
 
   # Create a config file if it doesn't exist
-  if (!file.exists(config_path)) {
-    # Create a configuration file
+  if (!file.exists("./scholarai_config.yml")) {
     scholarAI::save_scholar_config(
       output_dir = out_dir,
       authors = "Tobias%20Peter",
       db_path = db_path,
       prompt_path = prompt_path,
-      config_path = config_path,
       progress = FALSE
     )
   }
 
   # Check that the configuration file exists
-  expect_true(file.exists(config_path), "Configuration file not found")
+  expect_true(file.exists("./scholarai_config.yml"), "Configuration file not found")
 
   # Load the configuration
-  config <- scholarAI::load_scholar_config(config_path, progress = FALSE)
+  config <- scholarAI::load_scholar_config(progress = FALSE)
   expect_false(is.null(config), "Configuration could not be loaded")
 
   # Create a custom output file path in the test directory
   custom_output_file <- file.path(out_dir, "custom.R")
 
   # Generate scholar functions using the configuration
-  result <- scholarAI::generate_scholar_functions(
+  result <- scholarAI:::generate_scholar_functions(
     authors = "Tobias%20Peter",
     db_path = db_path,
     prompt_path = prompt_path,
-    config_path = config_path,
     output_dir = out_dir, # Specify output directory explicitly
     custom_file = custom_output_file, # Specify custom file path explicitly
     progress = FALSE

@@ -35,7 +35,7 @@ out_dir <- "./test_data/real_world_implementation"
 db_path <- file.path(out_dir, "corpus.duckdb")
 metadata_path <- file.path(out_dir, "metadata.rds")
 prompt_path <- file.path(out_dir, "scholar_instructions.md")
-config_path <- file.path(out_dir, "scholarai_config.yml")  # Config in test_data directory
+
 
 # Clear the directory at the start
 if (dir.exists(out_dir)) unlink(out_dir, recursive = TRUE)
@@ -45,10 +45,9 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 message("STEP 0: Saving initial configuration")
 
 # Create a configuration file
-config_path <- scholarAI::save_scholar_config(
+scholarAI::save_scholar_config(
   output_dir = out_dir,
   authors = "Tobias%20Peter",
-  config_path = config_path,  # Explicitly set config_path to be in test_data directory
   progress = FALSE
 )
 
@@ -57,10 +56,10 @@ message("Configuration saved to: ", config_path)
 
 test_that("Configuration can be saved", {
   # Test assertions
-  expect_true(file.exists(config_path))
+  expect_true(file.exists("./scholarai_config.yml"))
   
   # Load the config to verify it contains expected values
-  config <- scholarAI::load_scholar_config(config_path, progress = FALSE)
+  config <- scholarAI::load_scholar_config(progress = FALSE)
   
   # Use normalizePath to ensure consistent path comparison
   expect_equal(normalizePath(config$output_dir), normalizePath(out_dir))
@@ -185,7 +184,6 @@ scholarAI::save_scholar_config(
   output_dir = out_dir,
   authors = "Tobias%20Peter",
   db_path = db_path,
-  config_path = config_path,  # Explicitly use the config_path in test_data directory
   progress = FALSE
 )
 
@@ -194,4 +192,4 @@ message("Real-world implementation part 1 completed successfully")
 message("Output directory: ", out_dir)
 message("Database path: ", db_path)
 message("Number of articles scraped: ", nrow(scrape_results))
-message("Configuration path: ", config_path)
+message("Configuration path: ./scholarai_config.yml")

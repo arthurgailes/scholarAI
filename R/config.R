@@ -7,7 +7,7 @@
 #' @param output_dir Path to the directory where corpus files will be stored
 #' @param authors Character vector of author names
 #' @param db_path Path to the DuckDB database (if already created)
-#' @param config_path Path where the configuration file will be saved
+
 #' @param progress Whether to display progress information
 #'
 #' @return Invisibly returns the path to the created configuration file
@@ -16,7 +16,6 @@ save_scholar_config <- function(
   output_dir,
   authors = NULL,
   db_path = NULL,
-  config_path = "./scholarai_config.yml",
   progress = TRUE
 ) {
   # Check for required packages
@@ -35,11 +34,8 @@ save_scholar_config <- function(
     last_updated = format(Sys.time(), "%Y-%m-%d %H:%M:%S")
   )
   
-  # Ensure directory exists for config file
-  config_dir <- dirname(config_path)
-  if (!dir.exists(config_dir)) {
-    dir.create(config_dir, recursive = TRUE, showWarnings = FALSE)
-  }
+  # Always use default config file path
+  config_path <- "./scholarai_config.yml"
   
   # Write config to YAML file
   yaml::write_yaml(config, config_path)
@@ -62,7 +58,6 @@ save_scholar_config <- function(
 #' @return A list containing configuration settings
 #' @export
 load_scholar_config <- function(
-  config_path = "./scholarai_config.yml",
   progress = TRUE
 ) {
   # Check for required packages
@@ -70,6 +65,7 @@ load_scholar_config <- function(
     stop("Package 'yaml' is required but not installed.")
   }
   
+    config_path <- "./scholarai_config.yml"
   # Check if config file exists
   if (!file.exists(config_path)) {
     if (progress) {
@@ -104,11 +100,11 @@ load_scholar_config <- function(
 #' @export
 update_scholar_config <- function(
   ...,
-  config_path = "./scholarai_config.yml",
   progress = TRUE
 ) {
+    config_path <- "./scholarai_config.yml"
   # Load existing config
-  config <- load_scholar_config(config_path, progress = FALSE)
+  config <- load_scholar_config(progress = FALSE)
   
   # Update with new values
   new_values <- list(...)

@@ -71,7 +71,7 @@ generate_scholar_function <- function(
 #' @param progress Whether to display progress information
 #'
 #' @return A list containing the path to the custom.R file and the names of generated functions
-#' @keywords internal
+#' @export
 generate_scholar_functions <- function(
   authors = NULL,
   db_path = NULL,
@@ -188,8 +188,8 @@ generate_scholar_functions <- function(
       ),
       "  ask_scholar(",
       paste0("    query = query,"),
-      paste0("    db_path = \"", db_path, "\","),
-      paste0("    prompt_path = \"", prompt_path, "\","),
+      paste0("    db_path = \"", here::here(db_path), "\","),
+      paste0("    prompt_path = \"", here::here(prompt_path), "\","),
       paste0("    model = \"", prompt_model, "\","),
       "    limit = limit,",
       "    temperature = temperature,",
