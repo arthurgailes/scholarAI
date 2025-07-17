@@ -72,7 +72,7 @@ test_that("get_single_embedding respects timeout parameter", {
 
   # Create a test function that we can mock
   test_get_embedding <- function(txt, timeout) {
-    get_single_embedding(txt, timeout_sec = timeout, max_attempts = 1)
+    scholarAI:::get_single_embedding(txt, timeout_sec = timeout, max_attempts = 1)
   }
 
   # Mock httr::POST within our test function

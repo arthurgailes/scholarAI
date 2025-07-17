@@ -29,16 +29,14 @@ get_openai_embeddings <- function(
     return(matrix(numeric(0), nrow = 0, ncol = 0))
   }
 
-  results <- lapply(texts, function(txt) {
-    get_single_embedding(
-      txt,
-      model,
-      openai_key,
-      max_attempts,
-      pause_sec,
-      timeout_sec
-    )
-  })
+  results <- get_openai_embedding_batch(
+    texts = texts,
+    model = model,
+    openai_key = openai_key,
+    max_attempts = max_attempts,
+    pause_sec = pause_sec,
+    timeout_sec = timeout_sec
+  )
 
   emb_dim <- max(vapply(
     results,
@@ -52,9 +50,93 @@ get_openai_embeddings <- function(
     numeric(emb_dim)
   ))
   rownames(mat) <- NULL
-
   mat
 }
+
+# Internal: batch POST/retry logic for OpenAI embeddings
+get_openai_embedding_batch <- function(
+  texts,
+  model,
+  openai_key,
+  max_attempts,
+  pause_sec,
+  timeout_sec
+) {
+  batch_limit <- 96
+  batches <- split(seq_along(texts), ceiling(seq_along(texts)/batch_limit))
+  results <- vector("list", length(texts))
+  for (b in batches) {
+    batch_texts <- texts[b]
+    attempt <- 1
+    repeat {
+      resp <- tryCatch(
+        httr::POST(
+          url = "https://api.openai.com/v1/embeddings",
+          httr::add_headers(Authorization = paste("Bearer", openai_key)),
+          httr::content_type_json(),
+          httr::timeout(timeout_sec),
+          body = yyjsonr::write_json_str(
+            list(input = batch_texts, model = model),
+            auto_unbox = TRUE
+          )
+        ),
+        error = function(e) {
+          cli::cli_warn(c(
+            "!" = paste("HTTP error in OpenAI batch API call:", as.character(e)),
+            "i" = paste("Attempt", attempt, "/", max_attempts)
+          ))
+          return(e)
+        }
+      )
+      if (inherits(resp, "error")) {
+        if (attempt >= max_attempts) {
+          cli::cli_warn(c(
+            "!" = "Failed to get embedding batch after max attempts due to HTTP error",
+            "i" = paste0("Batch texts: ", paste(substr(batch_texts, 1, 30), collapse = ", "))
+          ))
+          for (i in seq_along(b)) results[[b[i]]] <- NA
+          break
+        }
+      } else if (inherits(resp, "response")) {
+        if (httr::status_code(resp) == 200) {
+          content <- tryCatch(httr::content(resp), error = function(e) NULL)
+          if (!is.null(content) && !is.null(content$data) && length(content$data) == length(batch_texts)) {
+            for (i in seq_along(batch_texts)) {
+              emb <- content$data[[i]]$embedding
+              results[[b[i]]] <- if (!is.null(emb)) as.numeric(emb) else NA
+            }
+            break
+          } else {
+            cli::cli_warn(c(
+              "!" = "API response missing expected embedding data (batch)",
+              "i" = "Response structure may have changed"
+            ))
+            for (i in seq_along(b)) results[[b[i]]] <- NA
+            break
+          }
+        } else {
+          status_code <- httr::status_code(resp)
+          content <- tryCatch(httr::content(resp), error = function(e) NULL)
+          error_message <- if (!is.null(content) && !is.null(content$error)) content$error$message else "Unknown error"
+          cli::cli_warn(c(
+            "!" = paste("API returned status code", status_code),
+            "i" = paste("Error:", error_message),
+            "i" = paste("Attempt", attempt, "/", max_attempts)
+          ))
+        }
+      }
+      if (attempt >= max_attempts) {
+        for (i in seq_along(b)) results[[b[i]]] <- rep(NA_real_, 1536)
+        break
+      }
+      attempt <- attempt + 1
+      Sys.sleep(pause_sec)
+    }
+  }
+  results
+}
+
+
 
 #' function for single embedding
 get_single_embedding <- function(
