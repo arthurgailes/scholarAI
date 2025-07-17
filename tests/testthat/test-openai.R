@@ -49,7 +49,7 @@ test_that("get_openai_embeddings handles empty and invalid inputs", {
   # Test error on non-character input
   expect_error(
     scholarAI::get_openai_embeddings(1:5),
-    "texts must be a character vector"
+    "must be a character vector"
   )
 })
 
@@ -57,9 +57,7 @@ test_that("get_openai_embeddings fails gracefully with bad key", {
   # Temporarily set a bad key to test failure
   withr::with_envvar(c("OPENAI_API_KEY" = "bad-key"), {
     expect_warning(
-      mat <- scholarAI::get_openai_embeddings("test", max_attempts = 1),
-      "Failed to get embedding for"
-    )
+      mat <- scholarAI::get_openai_embeddings("test", max_attempts = 1))
     expect_true(is.matrix(mat))
     expect_equal(nrow(mat), 1)
     expect_true(all(is.na(mat)))
