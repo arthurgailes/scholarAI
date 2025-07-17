@@ -70,3 +70,5 @@ test_that("build_ai_scholar validates inputs", {
     progress = FALSE
   ))
 })
+
+unlink("scholarai_config.yml")
