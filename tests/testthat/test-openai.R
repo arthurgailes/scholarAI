@@ -6,7 +6,7 @@ testthat::skip_if_not(
 )
 
 test_that("get_single_embedding returns a numeric vector of correct length", {
-  emb <- scholarAI::get_single_embedding("hello world")
+  emb <- scholarAI:::get_single_embedding("hello world")
   expect_true(is.numeric(emb))
   expect_true(is.vector(emb))
   expect_true(length(emb) == 1536)
@@ -69,24 +69,24 @@ test_that("get_single_embedding respects timeout parameter", {
     nzchar(Sys.getenv("OPENAI_API_KEY")),
     "No OpenAI API key found, skipping timeout test"
   )
-  
+
   # Create a test function that we can mock
   test_get_embedding <- function(txt, timeout) {
     get_single_embedding(txt, timeout_sec = timeout, max_attempts = 1)
   }
-  
+
   # Mock httr::POST within our test function
   mockery::stub(test_get_embedding, "httr::POST", function(...) {
     # Simulate a timeout error
     stop("Operation timed out")
   })
-  
+
   # Set a very short timeout that will trigger the mocked error
   expect_warning(
     result <- test_get_embedding("test text", 0.1),
     "HTTP error in OpenAI API call"
   )
-  
+
   # Should return NA when timeout occurs and max attempts reached
   expect_true(is.na(result))
 })
