@@ -8,6 +8,7 @@
 #' @param openai_key OpenAI API key. If NULL, will use OPENAI_API_KEY env var.
 #' @param max_attempts Maximum number of attempts per request (default 3).
 #' @param pause_sec Seconds to pause between retries (default 2).
+#' @param timeout_sec Maximum time in seconds to wait for a single embedding request (default 5).
 #' @return A numeric matrix of embeddings (rows = input texts).
 #' @examples
 #' \dontrun{
@@ -19,16 +20,17 @@ get_openai_embeddings <- function(
   model = "text-embedding-3-small",
   openai_key = Sys.getenv("OPENAI_API_KEY"),
   max_attempts = 3,
-  pause_sec = 0.1
+  pause_sec = 0.1,
+  timeout_sec = 5
 ) {
-  check_embedding_input(texts, openai_key, max_attempts, pause_sec)
+  check_embedding_input(texts, openai_key, max_attempts, pause_sec, timeout_sec)
 
   if (length(texts) == 0) {
     return(matrix(numeric(0), nrow = 0, ncol = 0))
   }
 
   results <- lapply(texts, function(txt) {
-    get_single_embedding(txt, model, openai_key, max_attempts, pause_sec)
+    get_single_embedding(txt, model, openai_key, max_attempts, pause_sec, timeout_sec)
   })
 
   emb_dim <- max(vapply(
@@ -53,7 +55,8 @@ get_single_embedding <- function(
   model = "text-embedding-3-small",
   openai_key = Sys.getenv("OPENAI_API_KEY"),
   max_attempts = 3,
-  pause_sec = 0.1
+  pause_sec = 0.1,
+  timeout_sec = 5
 ) {
   if (is.na(txt) || txt == "") {
     cli::cli_warn("Empty or NA text provided to get_single_embedding")
@@ -70,6 +73,7 @@ get_single_embedding <- function(
         url = "https://api.openai.com/v1/embeddings",
         httr::add_headers(Authorization = paste("Bearer", openai_key)),
         httr::content_type_json(),
+        httr::timeout(timeout_sec),
         body = yyjsonr::write_json_str(
           list(input = txt, model = model),
           auto_unbox = TRUE
@@ -152,7 +156,7 @@ get_single_embedding <- function(
   }
 }
 
-check_embedding_input <- function(texts, openai_key, max_attempts, pause_sec) {
+check_embedding_input <- function(texts, openai_key, max_attempts, pause_sec, timeout_sec) {
   if (!is.character(texts)) {
     cli::cli_abort(
       c(
@@ -166,4 +170,5 @@ check_embedding_input <- function(texts, openai_key, max_attempts, pause_sec) {
   if (!is.numeric(max_attempts) || max_attempts < 1)
     stop("max_attempts must be >= 1")
   if (!is.numeric(pause_sec) || pause_sec < 0) stop("pause_sec must be >= 0")
+  if (!is.numeric(timeout_sec) || timeout_sec <= 0) stop("timeout_sec must be > 0")
 }

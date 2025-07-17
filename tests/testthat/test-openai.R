@@ -1,8 +1,6 @@
-library(testthat)
-
 # This test requires a valid OPENAI_API_KEY to be set as an environment variable.
 # It will be skipped if the key is not available.
-skip_if_not(
+testthat::skip_if_not(
   nzchar(Sys.getenv("OPENAI_API_KEY")),
   "No OpenAI API key found, skipping API tests"
 )
@@ -57,9 +55,37 @@ test_that("get_openai_embeddings fails gracefully with bad key", {
   # Temporarily set a bad key to test failure
   withr::with_envvar(c("OPENAI_API_KEY" = "bad-key"), {
     expect_warning(
-      mat <- scholarAI::get_openai_embeddings("test", max_attempts = 1))
+      mat <- scholarAI::get_openai_embeddings("test", max_attempts = 1)
+    )
     expect_true(is.matrix(mat))
     expect_equal(nrow(mat), 1)
     expect_true(all(is.na(mat)))
   })
+})
+
+test_that("get_single_embedding respects timeout parameter", {
+  # Skip if no API key available
+  testthat::skip_if_not(
+    nzchar(Sys.getenv("OPENAI_API_KEY")),
+    "No OpenAI API key found, skipping timeout test"
+  )
+  
+  # Use mockery to mock httr::POST
+  mockery_stub <- mockery::stub(
+    get_single_embedding, 
+    "httr::POST",
+    function(...) {
+      # Simulate a timeout error
+      stop("Operation timed out")
+    }
+  )
+  
+  # Set a very short timeout that will trigger the mocked error
+  expect_warning(
+    result <- mockery_stub("test text", timeout_sec = 0.1, max_attempts = 1),
+    "HTTP error in OpenAI API call"
+  )
+  
+  # Should return NA when timeout occurs and max attempts reached
+  expect_true(is.na(result))
 })

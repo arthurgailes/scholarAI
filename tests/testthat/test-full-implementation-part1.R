@@ -35,7 +35,7 @@ out_dir <- "./test_data/real_world_implementation"
 db_path <- file.path(out_dir, "corpus.duckdb")
 metadata_path <- file.path(out_dir, "metadata.rds")
 prompt_path <- file.path(out_dir, "scholar_instructions.md")
-config_path <- file.path(out_dir, "scholarai_config.yml")  # Config in test directory
+config_path <- file.path(out_dir, "scholarai_config.yml")  # Config in test_data directory
 
 # Clear the directory at the start
 if (dir.exists(out_dir)) unlink(out_dir, recursive = TRUE)
@@ -48,6 +48,7 @@ message("STEP 0: Saving initial configuration")
 config_path <- scholarAI::save_scholar_config(
   output_dir = out_dir,
   authors = "Tobias%20Peter",
+  config_path = config_path,  # Explicitly set config_path to be in test_data directory
   progress = FALSE
 )
 
@@ -206,7 +207,7 @@ scholarAI::save_scholar_config(
   output_dir = out_dir,
   authors = "Tobias%20Peter",
   db_path = db_path,
-  config_path = config_path,
+  config_path = config_path,  # Explicitly use the config_path in test_data directory
   progress = FALSE
 )
 
