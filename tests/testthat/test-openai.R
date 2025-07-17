@@ -70,19 +70,20 @@ test_that("get_single_embedding respects timeout parameter", {
     "No OpenAI API key found, skipping timeout test"
   )
   
-  # Use mockery to mock httr::POST
-  mockery_stub <- mockery::stub(
-    get_single_embedding, 
-    "httr::POST",
-    function(...) {
-      # Simulate a timeout error
-      stop("Operation timed out")
-    }
-  )
+  # Create a test function that we can mock
+  test_get_embedding <- function(txt, timeout) {
+    get_single_embedding(txt, timeout_sec = timeout, max_attempts = 1)
+  }
+  
+  # Mock httr::POST within our test function
+  mockery::stub(test_get_embedding, "httr::POST", function(...) {
+    # Simulate a timeout error
+    stop("Operation timed out")
+  })
   
   # Set a very short timeout that will trigger the mocked error
   expect_warning(
-    result <- mockery_stub("test text", timeout_sec = 0.1, max_attempts = 1),
+    result <- test_get_embedding("test text", 0.1),
     "HTTP error in OpenAI API call"
   )
   
