@@ -119,10 +119,13 @@ ask_scholar <- function(
   tryCatch(
     {
       # Use the specified chat function
-      chat_fn_name <- paste0("ellmer::chat_", chat_function)
+      chat_fn <- get(
+        paste0("chat_", chat_function),
+        envir = asNamespace("ellmer")
+      )
 
       # Create chat instance
-      chat <- do.call(chat_fn_name, chat_args)
+      chat <- do.call(chat_fn, chat_args)
 
       # Generate response
       response <- chat$chat(prompt)
