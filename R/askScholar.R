@@ -9,10 +9,12 @@
 #' @param prompt_path Path to the scholar instructions file
 #' @param model Character string specifying the LLM model to use for generating responses
 #' @param limit Integer specifying the maximum number of documents to retrieve
-#' @param temperature Numeric value controlling randomness in response generation
-#' @param chat_function Character string specifying which ellmer chat function to use (e.g., "openrouter", "anthropic", "openai", "gemini")
+#' @param chat_function Character string specifying which ellmer chat function
+#' to use (e.g., "openrouter" (default), "anthropic", "openai", "gemini")
 #' @param progress Whether to display progress information
+#' @param ... Further arguments passed to ellmer chat function
 #'
+#' @inheritParams ellmer::chat_aei
 #' @return Character string containing the AI scholar's response to the query
 #' @export
 ask_scholar <- function(
@@ -21,9 +23,11 @@ ask_scholar <- function(
   prompt_path = NULL,
   model = "anthropic/claude-sonnet-4",
   limit = 5,
-  temperature = 0.7,
   chat_function = "openrouter",
-  progress = TRUE
+  api_args = list(temperature = 0.7),
+  echo = FALSE,
+  progress = TRUE,
+  ...
 ) {
   # Input validation
   if (!is.character(query) || length(query) != 1) {
@@ -55,41 +59,45 @@ ask_scholar <- function(
   on.exit(DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
 
   # Find similar documents
-  if (progress) cli::cli_alert_info("Finding relevant documents for query")
-  similar_docs <- find_similar_documents(con, query, limit = limit)
+  if (limit > 0) {
+    if (progress) cli::cli_alert_info("Finding relevant documents for query")
+    similar_docs <- find_similar_documents(con, query, limit = limit)
 
-  if (nrow(similar_docs) == 0) {
-    stop("No relevant documents found for the query")
-  }
+    if (nrow(similar_docs) == 0) {
+      stop("No relevant documents found for the query")
+    }
 
-  # Read the scholar instructions
-  if (progress) cli::cli_alert_info("Reading scholar instructions")
-  instructions <- readLines(prompt_path, warn = FALSE)
-  instructions <- paste(instructions, collapse = "\n")
+    # Read the scholar instructions
+    if (progress) cli::cli_alert_info("Reading scholar instructions")
+    instructions <- readLines(prompt_path, warn = FALSE)
+    instructions <- paste(instructions, collapse = "\n")
 
-  # Prepare context from similar documents
-  if (progress)
-    cli::cli_alert_info("Preparing context from {nrow(similar_docs)} documents")
-  context <- paste(
-    sapply(seq_len(nrow(similar_docs)), function(i) {
-      doc <- similar_docs[i, ]
-      paste0(
-        "Document ",
-        i,
-        ":\n",
-        "Title: ",
-        doc$title,
-        "\n",
-        "URL: ",
-        doc$url,
-        "\n",
-        "Content:\n",
-        doc$content,
-        "\n\n"
+    # Prepare context from similar documents
+    if (progress)
+      cli::cli_alert_info(
+        "Preparing context from {nrow(similar_docs)} documents"
       )
-    }),
-    collapse = "\n"
-  )
+    context <- paste(
+      sapply(seq_len(nrow(similar_docs)), function(i) {
+        doc <- similar_docs[i, ]
+        paste0(
+          "Document ",
+          i,
+          ":\n",
+          "Title: ",
+          doc$title,
+          "\n",
+          "URL: ",
+          doc$url,
+          "\n",
+          "Content:\n",
+          doc$content,
+          "\n\n"
+        )
+      }),
+      collapse = "\n"
+    )
+  } else context <- ""
 
   # Construct the prompt
   if (progress) cli::cli_alert_info("Constructing prompt")
@@ -112,7 +120,8 @@ ask_scholar <- function(
   chat_args <- list(
     model = model,
     system_prompt = "You are an AI scholar responding to queries based on provided context.",
-    api_args = list(temperature = temperature)
+    api_args = api_args,
+    ...
   )
 
   # Create chat instance and generate response

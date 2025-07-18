@@ -1,3 +1,5 @@
+# Evaluating for deprecation - not used anywhere
+
 #' Save scholarAI configuration to a YAML file
 #'
 #' Saves key configuration settings like output directory, authors, and database path
@@ -22,10 +24,10 @@ save_scholar_config <- function(
   if (!requireNamespace("yaml", quietly = TRUE)) {
     stop("Package 'yaml' is required but not installed.")
   }
-  
+
   # Ensure output_dir is absolute path
   output_dir <- normalizePath(output_dir, mustWork = FALSE)
-  
+
   # Create config list
   config <- list(
     output_dir = output_dir,
@@ -33,17 +35,17 @@ save_scholar_config <- function(
     db_path = db_path,
     last_updated = format(Sys.time(), "%Y-%m-%d %H:%M:%S")
   )
-  
+
   # Always use default config file path
   config_path <- "./scholarai_config.yml"
-  
+
   # Write config to YAML file
   yaml::write_yaml(config, config_path)
-  
+
   if (progress) {
     cli::cli_alert_success("Configuration saved to {.file {config_path}}")
   }
-  
+
   invisible(config_path)
 }
 
@@ -64,12 +66,14 @@ load_scholar_config <- function(
   if (!requireNamespace("yaml", quietly = TRUE)) {
     stop("Package 'yaml' is required but not installed.")
   }
-  
-    config_path <- "./scholarai_config.yml"
+
+  config_path <- "./scholarai_config.yml"
   # Check if config file exists
   if (!file.exists(config_path)) {
     if (progress) {
-      cli::cli_alert_warning("Configuration file not found at {.file {config_path}}")
+      cli::cli_alert_warning(
+        "Configuration file not found at {.file {config_path}}"
+      )
     }
     return(list(
       output_dir = NULL,
@@ -77,14 +81,14 @@ load_scholar_config <- function(
       db_path = NULL
     ))
   }
-  
+
   # Load config from YAML file
   config <- yaml::read_yaml(config_path)
-  
+
   if (progress) {
     cli::cli_alert_info("Configuration loaded from {.file {config_path}}")
   }
-  
+
   return(config)
 }
 
@@ -102,25 +106,25 @@ update_scholar_config <- function(
   ...,
   progress = TRUE
 ) {
-    config_path <- "./scholarai_config.yml"
+  config_path <- "./scholarai_config.yml"
   # Load existing config
   config <- load_scholar_config(progress = FALSE)
-  
+
   # Update with new values
   new_values <- list(...)
   for (name in names(new_values)) {
     config[[name]] <- new_values[[name]]
   }
-  
+
   # Update timestamp
   config$last_updated <- format(Sys.time(), "%Y-%m-%d %H:%M:%S")
-  
+
   # Write updated config
   yaml::write_yaml(config, config_path)
-  
+
   if (progress) {
     cli::cli_alert_success("Configuration updated at {.file {config_path}}")
   }
-  
+
   invisible(config_path)
 }
