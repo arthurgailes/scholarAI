@@ -47,17 +47,19 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 # Using Tobias Peter as the test author, limiting to 2 pages for reasonable test time
 message("STEP 1: Scraping AEI articles")
 
+test_that("AEI scraper is working", {
+  # Run the scraper with real web requests
+  scrape_results <- scholarAI::scrape_aei(
+    authors = "Tobias%20Peter",
+    output_root = out_dir,
+    max_pages = 1
+  )
 
-# Run the scraper with real web requests
-scrape_results <- scholarAI::scrape_aei(
-  authors = "Tobias%20Peter",
-  output_root = out_dir,
-  max_pages = 2
-)
-
-# Print scrape results summary
-message("Scrape results: ", nrow(scrape_results), " articles found")
-message("Columns: ", paste(names(scrape_results), collapse = ", "))
+  # Print scrape results summary
+  message("Scrape results: ", nrow(scrape_results), " articles found")
+  message("Columns: ", paste(names(scrape_results), collapse = ", "))
+  expect_gt(nrow(scrape_results), 10)
+})
 
 # Step 2: Convert the corpus to a dataframe
 message("STEP 2: Converting corpus to dataframe")

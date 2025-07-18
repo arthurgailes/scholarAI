@@ -43,8 +43,12 @@ get_author_links <- function(author_slug, max_pages = 2000, progress = TRUE) {
   out <- character()
 
   repeat {
-    if (page_num > max_pages) break
-    if (progress) message("Scraping page ", page_num)
+    if (page_num > max_pages) {
+      break
+    }
+    if (progress) {
+      message("Scraping page ", page_num)
+    }
 
     page_url <- paste0(url_prefix, page_num)
     res <- tryCatch(
@@ -55,7 +59,9 @@ get_author_links <- function(author_slug, max_pages = 2000, progress = TRUE) {
       ),
       error = function(e) NULL
     )
-    if (is.null(res) || httr::http_error(res)) break
+    if (is.null(res) || httr::http_error(res)) {
+      break
+    }
 
     pg <- xml2::read_html(res)
     # Replace pipe with nested function calls
@@ -63,7 +69,9 @@ get_author_links <- function(author_slug, max_pages = 2000, progress = TRUE) {
     links <- rvest::html_attr(post_elements, "href")
     links <- links[!is.na(links)]
 
-    if (length(links) == 0) break
+    if (length(links) == 0) {
+      break
+    }
     out <- c(out, links)
     page_num <- page_num + 1L
   }
@@ -152,9 +160,12 @@ scrape_aei <- function(
   ))
   link_vec <- unique(link_vec)
 
+  # Restrict to AEI domain to avoid irrelevant external links (e.g., Apple podcasts)
+  link_vec <- link_vec[grepl("^https?://(www\\.)?aei\\.org/", link_vec)]
+
+  # Exclude obvious non-article paths and assets
   link_vec <- link_vec[
-    grepl("^https?://", link_vec) &
-      !grepl("(profile/|uploads/|[.]pdf|[.]jpg|[.]png)", link_vec) &
+    !grepl("(profile/|uploads/|[.]pdf|[.]jpg|[.]png)", link_vec) &
       !grepl("aeideas$", link_vec)
   ]
   link_vec <- sub("^http://", "https://", link_vec)
@@ -186,7 +197,9 @@ scrape_aei <- function(
     )
   }
 
-  if(length(meta_list) == 0) stop("Author not found")
+  if (length(meta_list) == 0) {
+    stop("Author not found")
+  }
   meta_df <- collapse::rowbind(meta_list)
   link_df <- cbind(link_df, meta_df)
 
