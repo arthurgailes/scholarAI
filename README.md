@@ -14,7 +14,7 @@ And you're done!This will download a scholar's writing from aei.org and build:
 
 ## Usage
 
-The primary function of this is to chat with an AI scholar. `build_ai_scholar` will create a config files and a `scholar_functions.R` file, which contains a starter function for interacting with the scholar. For example, if the scholar is "Arthur Gailes", the function will be named `askArthur`.
+The primary function of this is to chat with an AI scholar. `build_ai_scholar` will create a  `scholar_functions.R` file, which contains a starter function for interacting with the scholar. For example, if the scholar is "Arthur Gailes", the function will be named `askArthur`.
 
 ```{r}
 library(scholarAI)
@@ -24,16 +24,22 @@ source("scholar_functions.R")
 askArthur("What is light-touch density?")
 ```
 
+## API Keys
+
+You'll need at least an OpenAI key, and additionally, and openRouter key by default. (You can use OpenAI exclusively, but this is an advanced feature.)
+
+```{r}
+Sys.setenv("OPENAI_API_KEY" = "your_openai_key")
+Sys.setenv("OPENROUTER_API_KEY" = "your_openrouter_key")
+```
+
 
 ## Manual setup
 
 `build_ai_scholar` is a convenience wrapper for the multiple peices of setup. If you want more control over the build process, you can run each step manually:
 
 ```{r}
-config_path <- scholarAI::save_scholar_config(
-    output_dir = output_dir,
-    authors = authors
-  )
+
 scrape_results <- scholarAI::scrape_aei(authors = authors)
 corpus_df <- scholarAI::text_corpus_to_df(output_dir)
 metadata_path <- scholarAI::save_corpus_metadata(output_dir)

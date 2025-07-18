@@ -28,15 +28,6 @@ prompt_path <- file.path(out_dir, "scholar_instructions.md")
 # Create a variable to hold embedding count - make it accessible to the find_similar_documents function
 assign("embedding_count", 0, envir = .GlobalEnv)
 
-# Ensure the config file exists in the test directory
-if (!file.exists("./scholarai_config.yml")) {
-  scholarAI::save_scholar_config(
-    output_dir = out_dir,
-    authors = "Tobias%20Peter",
-    db_path = db_path,
-    progress = FALSE
-  )
-}
 
 openai_avail <- Sys.getenv("OPENAI_API_KEY") != ""
 openrouter_avail <- Sys.getenv("OPENROUTER_API_KEY") != ""

@@ -3,40 +3,23 @@
 #
 # This file depends on the output from test-full-implementation-part2.R
 
+out_dir <- file.path(
+  testthat::test_path(),
+  "test_data",
+  "real_world_implementation"
+)
+
 # Step 7: Generate scholar functions
 message("STEP 7: Generating scholar functions")
 
 # Generate scholar functions and test in the same block
 test_that("Scholar functions can be generated", {
-  # Create a config file if it doesn't exist
-  if (!file.exists("./scholarai_config.yml")) {
-    scholarAI::save_scholar_config(
-      output_dir = out_dir,
-      authors = "Tobias%20Peter",
-      db_path = db_path,
-      prompt_path = prompt_path,
-      progress = FALSE
-    )
-  }
-
-  # Check that the configuration file exists
-  expect_true(
-    file.exists("./scholarai_config.yml"),
-    "Configuration file not found"
-  )
-
-  # Load the configuration
-  config <- scholarAI::load_scholar_config(progress = FALSE)
-  expect_false(is.null(config), "Configuration could not be loaded")
-
   # Create a custom output file path in the test directory
   custom_output_file <- file.path(out_dir, "custom.R")
 
   # Generate scholar functions using the configuration
   result <- scholarAI:::generate_scholar_functions(
     authors = "Tobias%20Peter",
-    db_path = db_path,
-    prompt_path = prompt_path,
     output_dir = out_dir, # Specify output directory explicitly
     custom_file = custom_output_file, # Specify custom file path explicitly
     progress = FALSE

@@ -35,15 +35,10 @@ build_ai_scholar <- function(
     dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
   }
 
-  # Step 0: Save configuration (not counted in test numbering)
-  if (progress) cli::cli_h1("Step 0: Saving configuration")
-  config_path <- save_scholar_config(
-    output_dir = output_dir,
-    authors = authors
-  )
-
   # Step 1: Scrape AEI articles
-  if (progress) cli::cli_h1("Step 1: Scraping AEI articles")
+  if (progress) {
+    cli::cli_h1("Step 1: Scraping AEI articles")
+  }
   scrape_results <- scrape_aei(
     authors = authors,
     output_root = output_dir,
@@ -51,26 +46,36 @@ build_ai_scholar <- function(
   )
 
   # Step 2: Convert corpus to dataframe
-  if (progress) cli::cli_h1("Step 2: Converting corpus to dataframe")
+  if (progress) {
+    cli::cli_h1("Step 2: Converting corpus to dataframe")
+  }
   corpus_df <- text_corpus_to_df(output_dir)
 
   # Step 3: Save corpus metadata
-  if (progress) cli::cli_h1("Step 3: Saving corpus metadata")
+  if (progress) {
+    cli::cli_h1("Step 3: Saving corpus metadata")
+  }
   metadata_path <- save_corpus_metadata(output_dir)
 
   # Step 4: Convert corpus to DuckDB
-  if (progress) cli::cli_h1("Step 4: Converting corpus to DuckDB")
+  if (progress) {
+    cli::cli_h1("Step 4: Converting corpus to DuckDB")
+  }
   db_path <- corpus_to_duckdb(corpus_dir = output_dir)
 
   # Step 5: Generate corpus embeddings
-  if (progress) cli::cli_h1("Step 5: Generating corpus embeddings")
+  if (progress) {
+    cli::cli_h1("Step 5: Generating corpus embeddings")
+  }
   corpus_embeddings(
     db_path = db_path,
     model = embedding_model
   )
 
   # Step 6: Build scholar prompt
-  if (progress) cli::cli_h1("Step 6: Building scholar prompt")
+  if (progress) {
+    cli::cli_h1("Step 6: Building scholar prompt")
+  }
   prompt_path <- build_scholar_prompt(
     corpus_path = output_dir,
     authors = authors,
@@ -79,16 +84,9 @@ build_ai_scholar <- function(
   )
 
   # Step 7: Generating scholar-specific functions
-  if (progress) cli::cli_h1("Step 7: Generating scholar-specific functions")
-
-  # Update the configuration with the latest paths
-  save_scholar_config(
-    output_dir = output_dir,
-    authors = authors,
-    db_path = db_path,
-    config_path = config_path,
-    progress = progress
-  )
+  if (progress) {
+    cli::cli_h1("Step 7: Generating scholar-specific functions")
+  }
 
   # Generate scholar-specific functions and create custom.R file
   scholar_result <- generate_scholar_functions(
@@ -97,7 +95,6 @@ build_ai_scholar <- function(
     prompt_path = prompt_path,
     prompt_model = prompt_model,
     output_dir = output_dir,
-    config_path = config_path,
     custom_file = custom_file
   )
 

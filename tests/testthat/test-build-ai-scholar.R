@@ -1,23 +1,31 @@
 test_that("build_ai_scholar function structure works", {
   # Mock the component functions to verify they're called correctly
-  mockery::stub(build_ai_scholar, "scrape_aei", function(...) data.frame(title = "Test Article"))
-  mockery::stub(build_ai_scholar, "text_corpus_to_df", function(...) data.frame(id = 1, content = "test content"))
-  mockery::stub(build_ai_scholar, "save_corpus_metadata", function(...) "metadata.json")
-  mockery::stub(build_ai_scholar, "corpus_to_duckdb", function(...) "corpus.duckdb")
+  mockery::stub(build_ai_scholar, "scrape_aei", function(...) {
+    data.frame(title = "Test Article")
+  })
+  mockery::stub(build_ai_scholar, "text_corpus_to_df", function(...) {
+    data.frame(id = 1, content = "test content")
+  })
+  mockery::stub(build_ai_scholar, "save_corpus_metadata", function(...) {
+    "metadata.json"
+  })
+  mockery::stub(build_ai_scholar, "corpus_to_duckdb", function(...) {
+    "corpus.duckdb"
+  })
   mockery::stub(build_ai_scholar, "corpus_embeddings", function(...) NULL)
-  mockery::stub(build_ai_scholar, "build_scholar_prompt", function(...) "instructions.md")
-  mockery::stub(build_ai_scholar, "generate_scholar_functions", function(...) list(custom_file = "custom.R", scholar_functions = c("askTest")))
+  mockery::stub(build_ai_scholar, "build_scholar_prompt", function(...) {
+    "instructions.md"
+  })
+  mockery::stub(build_ai_scholar, "generate_scholar_functions", function(...) {
+    list(custom_file = "custom.R", scholar_functions = c("askTest"))
+  })
 
   # Create a temp directory for testing
   temp_dir <- file.path(tempdir(), "test_scholar_build")
-  if (dir.exists(temp_dir)) unlink(temp_dir, recursive = TRUE)
+  if (dir.exists(temp_dir)) {
+    unlink(temp_dir, recursive = TRUE)
+  }
   dir.create(temp_dir, recursive = TRUE, showWarnings = FALSE)
-
-  # Create config path within temp_dir to avoid writing to current directory
-  config_path <- file.path(temp_dir, "scholarai_config.yml")
-
-  # Mock save_scholar_config to use the temp config path
-  mockery::stub(build_ai_scholar, "save_scholar_config", function(...) config_path)
 
   # Run the function with progress disabled to avoid console output in tests
   result <- build_ai_scholar(
@@ -47,21 +55,23 @@ test_that("build_ai_scholar validates inputs", {
 
   # Should pass with minimal valid inputs (but mock the implementation)
   mockery::stub(build_ai_scholar, "scrape_aei", function(...) data.frame())
-  mockery::stub(build_ai_scholar, "text_corpus_to_df", function(...) data.frame())
+  mockery::stub(build_ai_scholar, "text_corpus_to_df", function(...) {
+    data.frame()
+  })
   mockery::stub(build_ai_scholar, "save_corpus_metadata", function(...) "")
   mockery::stub(build_ai_scholar, "corpus_to_duckdb", function(...) "")
   mockery::stub(build_ai_scholar, "corpus_embeddings", function(...) NULL)
   mockery::stub(build_ai_scholar, "build_scholar_prompt", function(...) "")
-  mockery::stub(build_ai_scholar, "generate_scholar_functions", function(...) list(custom_file = "custom.R", scholar_functions = c("askTest")))
+  mockery::stub(build_ai_scholar, "generate_scholar_functions", function(...) {
+    list(custom_file = "custom.R", scholar_functions = c("askTest"))
+  })
 
-  # Create a temp directory and config path for this test
+  # Create a temp directory for this test
   test_temp_dir <- file.path(tempdir(), "test_scholar_build2")
-  if (dir.exists(test_temp_dir)) unlink(test_temp_dir, recursive = TRUE)
+  if (dir.exists(test_temp_dir)) {
+    unlink(test_temp_dir, recursive = TRUE)
+  }
   dir.create(test_temp_dir, recursive = TRUE, showWarnings = FALSE)
-  test_config_path <- file.path(test_temp_dir, "scholarai_config.yml")
-
-  # Mock save_scholar_config to use the temp config path
-  mockery::stub(build_ai_scholar, "save_scholar_config", function(...) test_config_path)
 
   # This should not error with proper mocking
   expect_no_error(build_ai_scholar(
@@ -70,5 +80,3 @@ test_that("build_ai_scholar validates inputs", {
     progress = FALSE
   ))
 })
-
-unlink(c("scholarai_config.yml", "corpus"), recursive = TRUE)

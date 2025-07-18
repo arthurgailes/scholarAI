@@ -11,7 +11,6 @@ scrape_results <- NULL
 corpus_df <- NULL
 metadata_path <- NULL
 db_path <- NULL
-config_path <- NULL
 
 test_that("env is ready", {
   expect_true(
@@ -38,33 +37,11 @@ prompt_path <- file.path(out_dir, "scholar_instructions.md")
 
 
 # Clear the directory at the start
-if (dir.exists(out_dir)) unlink(out_dir, recursive = TRUE)
+if (dir.exists(out_dir)) {
+  unlink(out_dir, recursive = TRUE)
+}
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-# Step 0: Save initial configuration
-message("STEP 0: Saving initial configuration")
-
-# Create a configuration file
-scholarAI::save_scholar_config(
-  output_dir = out_dir,
-  authors = "Tobias%20Peter",
-  progress = FALSE
-)
-
-# Print config file info
-message("Configuration saved to: ", config_path)
-
-test_that("Configuration can be saved", {
-  # Test assertions
-  expect_true(file.exists("./scholarai_config.yml"))
-  
-  # Load the config to verify it contains expected values
-  config <- scholarAI::load_scholar_config(progress = FALSE)
-  
-  # Use normalizePath to ensure consistent path comparison
-  expect_equal(normalizePath(config$output_dir), normalizePath(out_dir))
-  expect_equal(config$authors, "Tobias%20Peter")
-})
 
 # Step 1: Scrape AEI articles for a specific author
 # Using Tobias Peter as the test author, limiting to 2 pages for reasonable test time
@@ -153,43 +130,43 @@ test_that("Corpus can be converted to DuckDB", {
 
 test_that("DuckDB corpus contains valid content", {
   # This test depends on the successful creation of the database in the previous test
-  skip_if_not(file.exists(db_path), "Database file not found, skipping content check.")
+  skip_if_not(
+    file.exists(db_path),
+    "Database file not found, skipping content check."
+  )
 
   # Connect to the database
   con <- DBI::dbConnect(duckdb::duckdb(), db_path)
   on.exit(DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
 
   # Check that a good portion of the content is not NULL and has length
-  content_check <- DBI::dbGetQuery(con, "
+  content_check <- DBI::dbGetQuery(
+    con,
+    "
     SELECT
       CAST(SUM(CASE WHEN content IS NOT NULL AND LENGTH(content) > 100 THEN 1 ELSE 0 END) AS DOUBLE) / COUNT(*) as ratio_with_content,
       AVG(LENGTH(content)) as avg_content_length
     FROM corpus
-  ")
+  "
+  )
 
   # Expect at least 80% of documents to have substantial content
-  expect_gt(content_check$ratio_with_content, 0.8,
-            label = "Ratio of documents with content > 100 chars")
+  expect_gt(
+    content_check$ratio_with_content,
+    0.8,
+    label = "Ratio of documents with content > 100 chars"
+  )
 
   # Expect average content length to be substantial (e.g., > 500 chars)
-  expect_gt(content_check$avg_content_length, 500,
-            label = "Average content length")
+  expect_gt(
+    content_check$avg_content_length,
+    500,
+    label = "Average content length"
+  )
 })
-
-# Update configuration with paths
-message("Updating configuration with paths")
-
-# Update configuration with database path
-scholarAI::save_scholar_config(
-  output_dir = out_dir,
-  authors = "Tobias%20Peter",
-  db_path = db_path,
-  progress = FALSE
-)
 
 # Print summary of part 1
 message("Real-world implementation part 1 completed successfully")
 message("Output directory: ", out_dir)
 message("Database path: ", db_path)
 message("Number of articles scraped: ", nrow(scrape_results))
-message("Configuration path: ./scholarai_config.yml")
