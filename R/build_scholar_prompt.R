@@ -27,8 +27,8 @@ build_scholar_prompt <- function(
   authors = NULL,
   output_path = "scholar_instructions.md",
   model_name = "google/gemini-2.5-pro",
-  batch_size = 10,
-  max_token_per_batch = 8000,
+  batch_size = 50,
+  max_token_per_batch = 40000,
   api_key = NULL,
   progress = TRUE
 ) {
