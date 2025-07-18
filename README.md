@@ -33,6 +33,11 @@ Sys.setenv("OPENAI_API_KEY" = "your_openai_key")
 Sys.setenv("OPENROUTER_API_KEY" = "your_openrouter_key")
 ```
 
+Or, set permantently by adding keys to your .Renviron file:
+```{r}
+usethis::edit_r_environ()
+```
+
 
 ## Manual setup
 

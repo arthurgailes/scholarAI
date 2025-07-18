@@ -259,8 +259,9 @@ update_instructions <- function(
   if (current_instructions == "") {
     prompt <- paste0(
       "Analyze the following text from a scholar's writings. ",
-      "Extract the author's writing style, voice, topics of interest, and unique characteristics. ",
-      "Create a markdown document with instructions (max 1000 words) that would help someone replicate this scholar's style and voice. ",
+      "Extract the author's writing style, voice, topics of interest, and unique characteristics using this template: ",
+      scholar_prompt_template,
+      "Create a markdown document with instructions (max 1000 words) . ",
       "Focus on what makes their writing unique and recognizable.\n\n",
       "TEXT:\n",
       batch_text
@@ -299,8 +300,12 @@ finalize_instructions <- function(
     cli::cli_alert_info("Finalizing scholar instructions")
   }
 
-  if (is.null(authors)) authors <- "the primary author(s)"
-  if (length(authors) > 1) authors <- paste(authors, collapse = ",")
+  if (is.null(authors)) {
+    authors <- "the primary author(s)"
+  }
+  if (length(authors) > 1) {
+    authors <- paste(authors, collapse = ",")
+  }
 
   # Count words in current instructions
   word_count <- length(strsplit(instructions, "\\s+")[[1]])
@@ -310,7 +315,9 @@ finalize_instructions <- function(
     "Polish the following instructions for replicating the writing style of",
     authors,
     ". Ensure they are clear, concise, and well-organized while maintaining all key insights.",
-    "Keep the total length under 1000 words.\n\n",
+    "Here is the original template:\n\n",
+    scholar_prompt_template,
+    "\n\nKeep the total length under 1000 words.\n\n",
     instructions
   )
 
@@ -369,3 +376,23 @@ extract_markdown_content <- function(response) {
   # to handle various response formats
   return(response)
 }
+
+scholar_prompt_template <- ("
+Goal: produce a less than 1,000-word markdown guide that lets an LLM 
+convincingly reproduce the scholar's writing style and substance - as though
+it were written by the author themselves.
+
+Return these H2 sections only  
+  ## Voice & Tone           
+  ## Lexicon                
+  ## Syntax & Rhythm        
+  ## Argument Structure     
+  ## Rhetorical Devices     
+  ## Do / Don’t Checklist   
+  ## Primary themes, topics, motifs, solutions
+  ## Miscellanea
+
+Rules  
+- Quote scholar verbatim for examples (block-quotes).  
+- Include ONLY traits seen in ≥3 excerpts; skip generic academia.  
+- Prefer precise observations to vague adjectives.  ")
