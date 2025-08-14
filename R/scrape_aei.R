@@ -179,7 +179,7 @@ scrape_aei <- function(
       USE.NAMES = FALSE
     )
   )
-  write.csv(
+  utils::write.csv(
     link_df,
     file.path(output_root, "scraped_links.csv"),
     row.names = FALSE
@@ -203,7 +203,7 @@ scrape_aei <- function(
   meta_df <- collapse::rowbind(meta_list)
   link_df <- cbind(link_df, meta_df)
 
-  write.csv(
+  utils::write.csv(
     link_df,
     file.path(output_root, "updated_scraped_links.csv"),
     row.names = FALSE

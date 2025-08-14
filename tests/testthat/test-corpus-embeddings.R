@@ -94,3 +94,30 @@ test_that("corpus_embeddings creates embeddings in DuckDB", {
 
   expect_equal(similar_docs$id[1], 1)
 })
+
+
+test_that("get_text_embedding truncates input longer than 8000 tokens", {
+  library(mockery)
+
+  # Create a long string to simulate >8000 tokens (simulate with repeated word)
+  long_text <- paste(rep("word", 8200), collapse = " ")
+
+  # Ensure API key check in get_text_embedding passes during the stubbed call
+  old_key <- Sys.getenv("OPENAI_API_KEY")
+  Sys.setenv(OPENAI_API_KEY = "test")
+  on.exit(Sys.setenv(OPENAI_API_KEY = old_key), add = TRUE)
+
+  # Apply stub before invoking the function under test
+  stub(
+    where = scholarAI::get_text_embedding,
+    what = "get_openai_embeddings",
+    how = function(texts, ...) matrix(1, nrow = 1, ncol = 1536)
+  )
+
+  expect_warning(
+    emb <- scholarAI::get_text_embedding(long_text, model = "text-embedding-3-small"),
+    regexp = "truncated"
+  )
+  expect_type(emb, "double")
+  expect_equal(length(emb), 1536)
+})

@@ -12,6 +12,7 @@ find_similar_documents <- function(
   limit = 10,
   min_similarity = 0.05
 ) {
+  # TODO: return in a nicer format
   # Check if embeddings table exists
   tables <- DBI::dbListTables(con)
   if (!"embeddings" %in% tables) {

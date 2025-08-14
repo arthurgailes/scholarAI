@@ -14,7 +14,7 @@
 #' @param progress Whether to display progress information
 #' @param ... Further arguments passed to ellmer chat function
 #'
-#' @inheritParams ellmer::chat_aei
+#' @inheritParams ellmer::chat
 #' @return Character string containing the AI scholar's response to the query
 #' @export
 ask_scholar <- function(
@@ -54,13 +54,22 @@ ask_scholar <- function(
   }
 
   # Connect to the database
-  if (progress) cli::cli_alert_info("Connecting to database")
-  con <- DBI::dbConnect(duckdb::duckdb(), db_path, array = "matrix")
+  if (progress) {
+    cli::cli_alert_info("Connecting to database")
+  }
+  con <- DBI::dbConnect(
+    duckdb::duckdb(),
+    db_path,
+    array = "matrix",
+    read_only = TRUE
+  )
   on.exit(DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
 
   # Find similar documents
   if (limit > 0) {
-    if (progress) cli::cli_alert_info("Finding relevant documents for query")
+    if (progress) {
+      cli::cli_alert_info("Finding relevant documents for query")
+    }
     similar_docs <- find_similar_documents(con, query, limit = limit)
 
     if (nrow(similar_docs) == 0) {
@@ -68,15 +77,18 @@ ask_scholar <- function(
     }
 
     # Read the scholar instructions
-    if (progress) cli::cli_alert_info("Reading scholar instructions")
+    if (progress) {
+      cli::cli_alert_info("Reading scholar instructions")
+    }
     instructions <- readLines(prompt_path, warn = FALSE)
     instructions <- paste(instructions, collapse = "\n")
 
     # Prepare context from similar documents
-    if (progress)
+    if (progress) {
       cli::cli_alert_info(
         "Preparing context from {nrow(similar_docs)} documents"
       )
+    }
     context <- paste(
       sapply(seq_len(nrow(similar_docs)), function(i) {
         doc <- similar_docs[i, ]
@@ -97,10 +109,14 @@ ask_scholar <- function(
       }),
       collapse = "\n"
     )
-  } else context <- ""
+  } else {
+    context <- ""
+  }
 
   # Construct the prompt
-  if (progress) cli::cli_alert_info("Constructing prompt")
+  if (progress) {
+    cli::cli_alert_info("Constructing prompt")
+  }
   prompt <- paste0(
     instructions,
     "\n\n",
@@ -114,7 +130,9 @@ ask_scholar <- function(
   )
 
   # Generate the response using ellmer package
-  if (progress) cli::cli_alert_info("Generating response using {model}")
+  if (progress) {
+    cli::cli_alert_info("Generating response using {model}")
+  }
 
   # Set up chat arguments
   chat_args <- list(
@@ -136,7 +154,9 @@ ask_scholar <- function(
       # Create chat instance
       chat <- do.call(chat_fn, chat_args)
 
-      if (progress) cli::cli_alert_success("Response generated successfully")
+      if (progress) {
+        cli::cli_alert_success("Response generated successfully")
+      }
       return(chat$chat(prompt))
     },
     error = function(e) {
